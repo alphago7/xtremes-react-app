@@ -34,113 +34,99 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const [companyName, setCompanyName] = useState('');
   const [containerMounted, setContainerMounted] = useState(false);
 
-  // Track when container ref is set
+  // Track when container ref is set and initialize chart immediately
   const setChartContainerRef = (node: HTMLDivElement | null) => {
     (chartContainerRef as any).current = node;
-    if (node) {
-      console.log('[REF] Container ref set');
+
+    if (node && isOpen && !chartRef.current) {
+      console.log('[REF] Container ref set, initializing chart immediately...');
       setContainerMounted(true);
-    } else {
+
+      // Initialize chart immediately
+      (async () => {
+        try {
+          console.log('[INIT] Container dimensions:', node.clientWidth, 'x', node.clientHeight);
+          console.log('[INIT] Loading lightweight-charts...');
+
+          const { createChart } = await import('lightweight-charts');
+          console.log('[INIT] lightweight-charts loaded ✅');
+
+          console.log('[INIT] Creating chart instance...');
+          const chart = createChart(node, {
+            layout: {
+              background: { color: '#0a0a0a' },
+              textColor: '#d1d5db',
+            },
+            grid: {
+              vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+              horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            },
+            width: node.clientWidth,
+            height: 500,
+            timeScale: {
+              borderColor: '#374151',
+              timeVisible: true,
+            },
+            rightPriceScale: {
+              borderColor: '#374151',
+            },
+          });
+
+          console.log('[INIT] Adding candlestick series...');
+          const candlestickSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+          });
+
+          chartRef.current = chart;
+          candlestickSeriesRef.current = candlestickSeries;
+
+          console.log('[INIT] Chart ready! ✅');
+
+          // Setup resize observer
+          resizeObserverRef.current = new ResizeObserver(entries => {
+            if (chart && entries.length > 0) {
+              const { width } = entries[0].contentRect;
+              chart.applyOptions({ width });
+            }
+          });
+          resizeObserverRef.current.observe(node);
+
+          // If data is already loaded, set it now
+          if (chartData.length > 0) {
+            console.log('[INIT] Data already loaded, setting to chart...');
+            candlestickSeries.setData(chartData);
+            chart.timeScale().fitContent();
+          }
+        } catch (error) {
+          console.error('[INIT] Error:', error);
+        }
+      })();
+    } else if (!node) {
       setContainerMounted(false);
     }
   };
 
-  // Initialize chart when panel opens AND container is mounted
+  // Cleanup when panel closes
   useEffect(() => {
-    console.log(`[EFFECT] Chart init effect triggered - isOpen: ${isOpen}, containerMounted: ${containerMounted}, hasContainer: ${!!chartContainerRef.current}`);
-
     if (!isOpen) {
-      console.log('[INIT] Panel not open');
-      return;
-    }
-
-    if (!containerMounted || !chartContainerRef.current) {
-      console.log('[INIT] Container not ready - containerMounted:', containerMounted, 'ref:', !!chartContainerRef.current);
-      return;
-    }
-
-    console.log('[INIT] All conditions met, starting initialization...');
-
-    let chart: any = null;
-    let candlestickSeries: any = null;
-
-    const initChart = async () => {
-      try {
-        const container = chartContainerRef.current;
-        if (!container) {
-          console.error('[INIT] Container ref became null!');
-          return;
-        }
-
-        console.log('[INIT] Container dimensions:', container.clientWidth, 'x', container.clientHeight);
-        console.log('[INIT] Loading lightweight-charts...');
-
-        // Dynamically import
-        const { createChart } = await import('lightweight-charts');
-        console.log('[INIT] lightweight-charts loaded ✅');
-
-        console.log('[INIT] Creating chart instance...');
-        chart = createChart(container, {
-          layout: {
-            background: { color: '#0a0a0a' },
-            textColor: '#d1d5db',
-          },
-          grid: {
-            vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
-            horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
-          },
-          width: container.clientWidth,
-          height: 500,
-          timeScale: {
-            borderColor: '#374151',
-            timeVisible: true,
-          },
-          rightPriceScale: {
-            borderColor: '#374151',
-          },
-        });
-
-        console.log('[INIT] Adding candlestick series...');
-        candlestickSeries = chart.addCandlestickSeries({
-          upColor: '#10b981',
-          downColor: '#ef4444',
-          borderVisible: false,
-          wickUpColor: '#10b981',
-          wickDownColor: '#ef4444',
-        });
-
-        chartRef.current = chart;
-        candlestickSeriesRef.current = candlestickSeries;
-
-        console.log('[INIT] Chart ready! ✅');
-
-        // Setup resize observer
-        resizeObserverRef.current = new ResizeObserver(entries => {
-          if (chart && entries.length > 0) {
-            const { width } = entries[0].contentRect;
-            chart.applyOptions({ width });
-          }
-        });
-        resizeObserverRef.current.observe(container);
-      } catch (error) {
-        console.error('[INIT] Error:', error);
-      }
-    };
-
-    initChart();
-
-    return () => {
-      console.log('[CLEANUP] Removing chart...');
+      console.log('[CLEANUP] Panel closed, cleaning up...');
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
       }
-      if (chart) {
-        chart.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        candlestickSeriesRef.current = null;
       }
-      chartRef.current = null;
-      candlestickSeriesRef.current = null;
-    };
-  }, [isOpen, containerMounted]);
+      setContainerMounted(false);
+      setChartData([]);
+    }
+  }, [isOpen]);
 
   // Fetch OHLC data
   useEffect(() => {
@@ -174,23 +160,22 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
 
             setChartData(formattedData);
 
-            // Set data to chart if ready
-            if (candlestickSeriesRef.current) {
-              console.log('[DATA] Setting data to chart...');
-              candlestickSeriesRef.current.setData(formattedData);
-              chartRef.current?.timeScale().fitContent();
-              console.log('[DATA] Chart updated ✅');
-            } else {
-              console.warn('[DATA] Chart not ready yet, will retry...');
-              // Retry after a short delay
-              setTimeout(() => {
-                if (candlestickSeriesRef.current) {
-                  console.log('[DATA] Retry: Setting data to chart...');
-                  candlestickSeriesRef.current.setData(formattedData);
-                  chartRef.current?.timeScale().fitContent();
-                }
-              }, 200);
-            }
+            // Set data to chart (with retries if needed)
+            const setDataToChart = (retries = 0) => {
+              if (candlestickSeriesRef.current) {
+                console.log('[DATA] Setting data to chart...');
+                candlestickSeriesRef.current.setData(formattedData);
+                chartRef.current?.timeScale().fitContent();
+                console.log('[DATA] Chart updated ✅');
+              } else if (retries < 5) {
+                console.log(`[DATA] Chart not ready, retry ${retries + 1}/5 in 300ms...`);
+                setTimeout(() => setDataToChart(retries + 1), 300);
+              } else {
+                console.error('[DATA] Chart never became ready after 5 retries');
+              }
+            };
+
+            setDataToChart();
           }
         }
 
