@@ -31,6 +31,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<CandlestickData[]>([]);
   const [companyName, setCompanyName] = useState('');
+  const [chartReady, setChartReady] = useState(false);
 
   // Initialize chart
   useEffect(() => {
@@ -88,6 +89,9 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
       chartRef.current = chart;
       candlestickSeriesRef.current = candlestickSeries;
 
+      console.log('Chart initialized successfully');
+      setChartReady(true);
+
       // Handle resize
       const handleResize = () => {
         if (chartContainerRef.current && chartRef.current) {
@@ -98,21 +102,25 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
       };
 
       window.addEventListener('resize', handleResize);
-
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        chart.remove();
-        chartRef.current = null;
-        candlestickSeriesRef.current = null;
-      };
     }, 100);
 
-    return () => clearTimeout(timer);
+    return () => {
+      setChartReady(false);
+      if (chartRef.current) {
+        window.removeEventListener('resize', () => {});
+        chartRef.current.remove();
+        chartRef.current = null;
+        candlestickSeriesRef.current = null;
+      }
+    };
   }, [isOpen]);
 
-  // Fetch OHLC data
+  // Fetch OHLC data - only after chart is ready
   useEffect(() => {
-    if (!isOpen || !symbol) return;
+    if (!isOpen || !symbol || !chartReady) {
+      console.log(`Waiting for chart ready: isOpen=${isOpen}, symbol=${symbol}, chartReady=${chartReady}`);
+      return;
+    }
 
     const fetchData = async () => {
       setLoading(true);
@@ -172,7 +180,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
     };
 
     fetchData();
-  }, [symbol, exchange, selectedTimeframe, isOpen]);
+  }, [symbol, exchange, selectedTimeframe, isOpen, chartReady]);
 
   const latestPrice = chartData.length > 0 ? chartData[chartData.length - 1].close : 0;
   const priceChange =
@@ -240,9 +248,17 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
                 <div className="text-sm text-muted-foreground">Loading chart data...</div>
               </div>
             )}
+
+            {/* Debug Info */}
+            <div className="absolute top-2 right-2 z-20 bg-black/80 p-2 rounded text-xs text-white">
+              <div>Chart Ready: {chartReady ? '✅' : '❌'}</div>
+              <div>Data Points: {chartData.length}</div>
+              <div>Loading: {loading ? 'Yes' : 'No'}</div>
+            </div>
+
             <div ref={chartContainerRef} className="w-full h-full" style={{ minHeight: '500px' }} />
 
-            {chartData.length === 0 && !loading && (
+            {chartData.length === 0 && !loading && chartReady && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">No chart data available</p>
