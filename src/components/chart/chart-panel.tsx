@@ -268,9 +268,12 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
 
             {/* Debug Panel */}
             <div className="absolute top-4 right-4 z-20 bg-black/90 px-3 py-2 rounded border border-white/20 text-xs text-white space-y-1">
+              <div>Container: {containerMounted ? '✅' : '❌'}</div>
               <div>Chart: {chartRef.current ? '✅' : '❌'}</div>
+              <div>Series: {candlestickSeriesRef.current ? '✅' : '❌'}</div>
               <div>Candles: {chartData.length}</div>
               <div>Loading: {loading ? 'Yes' : 'No'}</div>
+              <div>Symbol: {symbol}</div>
             </div>
 
             {/* Chart Container */}
