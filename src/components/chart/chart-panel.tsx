@@ -32,10 +32,30 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [companyName, setCompanyName] = useState('');
+  const [containerMounted, setContainerMounted] = useState(false);
 
-  // Initialize chart when panel opens
+  // Track when container ref is set
+  const setChartContainerRef = (node: HTMLDivElement | null) => {
+    (chartContainerRef as any).current = node;
+    if (node) {
+      console.log('[REF] Container ref set');
+      setContainerMounted(true);
+    } else {
+      setContainerMounted(false);
+    }
+  };
+
+  // Initialize chart when panel opens AND container is mounted
   useEffect(() => {
-    if (!isOpen || !chartContainerRef.current) return;
+    if (!isOpen) {
+      console.log('[INIT] Panel not open');
+      return;
+    }
+
+    if (!containerMounted || !chartContainerRef.current) {
+      console.log('[INIT] Container not mounted yet');
+      return;
+    }
 
     let chart: any = null;
     let candlestickSeries: any = null;
@@ -111,7 +131,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
       chartRef.current = null;
       candlestickSeriesRef.current = null;
     };
-  }, [isOpen]);
+  }, [isOpen, containerMounted]);
 
   // Fetch OHLC data
   useEffect(() => {
@@ -255,7 +275,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
 
             {/* Chart Container */}
             <div
-              ref={chartContainerRef}
+              ref={setChartContainerRef}
               className="w-full"
               style={{ height: '500px' }}
             />
