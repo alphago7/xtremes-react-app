@@ -4,17 +4,22 @@ import { supabase } from '@/lib/supabase';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
 import type { ExtremSymbol } from '@/types';
 
+type ExchangeFilter = 'ALL' | 'NSE' | 'US';
+
 interface StockIndicatorRow {
   symbol: string;
   company_name: string;
-  exchange: string;
-  [key: string]: string | number | null;
+  exchange?: string;
+  [key: string]: string | number | null | undefined;
 }
+
+const getIndicatorTable = (exchange: ExchangeFilter) =>
+  exchange === 'US' ? 'stock_indicators_us' : 'stock_indicators';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const exchange = searchParams.get('exchange') || 'ALL';
+    const exchange = (searchParams.get('exchange') as ExchangeFilter | null) || 'ALL';
     const category = searchParams.get('category') || 'all';
     const limit = parseInt(searchParams.get('limit') || '10');
 
@@ -30,21 +35,26 @@ export async function GET(request: NextRequest) {
         const selectColumns = [
           'symbol',
           'company_name',
-          'exchange',
           config.valueColumn,
         ];
+
+        const tableName = getIndicatorTable(exchange);
+
+        if (tableName !== 'stock_indicators_us') {
+          selectColumns.push('exchange');
+        }
 
         if (config.extremeColumn) {
           selectColumns.push(config.extremeColumn);
         }
 
         let query = supabase
-          .from<StockIndicatorRow>('stock_indicators')
+          .from<StockIndicatorRow>(tableName)
           .select(selectColumns.join(', '))
           .not(config.valueColumn, 'is', null);
 
         // Apply exchange filter
-        if (exchange !== 'ALL') {
+        if (exchange !== 'ALL' && tableName === 'stock_indicators') {
           query = query.eq('exchange', exchange);
         }
 
@@ -62,14 +72,23 @@ export async function GET(request: NextRequest) {
         }
 
         // Transform data to match ExtremSymbol interface
-        const transformedData: ExtremSymbol[] = (data || []).map((item) => ({
-          ticker: item.symbol,
-          company_name: item.company_name,
-          value: Number(item[config.valueColumn] ?? 0),
-          extreme: config.extremeColumn ? (item[config.extremeColumn] as string | null) : item.exchange,
-          exchange: item.exchange,
-          sparkline: [],
-        }));
+        const transformedData: ExtremSymbol[] = (data || []).map((item) => {
+          const exchangeValue =
+            tableName === 'stock_indicators_us'
+              ? 'US'
+              : (item.exchange as string | undefined);
+
+          return {
+            ticker: item.symbol,
+            company_name: item.company_name,
+            value: Number(item[config.valueColumn] ?? 0),
+            extreme: config.extremeColumn
+              ? (item[config.extremeColumn] as string | null)
+              : exchangeValue ?? null,
+            exchange: exchangeValue,
+            sparkline: [],
+          };
+        });
 
         return { key: config.key, data: transformedData };
       } catch (err) {

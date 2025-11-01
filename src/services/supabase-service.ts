@@ -9,12 +9,17 @@ import {
   ExtremSymbol
 } from '@/types';
 
+type ExchangeFilter = 'NSE' | 'US' | 'ALL';
+
 interface StockIndicatorRow {
   symbol: string;
   company_name: string;
-  exchange: string;
-  [key: string]: string | number | null;
+  exchange?: string;
+  [key: string]: string | number | null | undefined;
 }
+
+const getStockIndicatorTable = (exchange: ExchangeFilter = 'NSE') =>
+  exchange === 'US' ? 'stock_indicators_us' : 'stock_indicators';
 
 export class SupabaseService {
   // Fetch all symbols
@@ -43,9 +48,11 @@ export class SupabaseService {
   }
 
   // Get stock indicators for a specific date
-  static async getStockIndicators(date?: string): Promise<StockIndicator[]> {
+  static async getStockIndicators(date?: string, exchange: ExchangeFilter = 'NSE'): Promise<StockIndicator[]> {
+    const tableName = getStockIndicatorTable(exchange);
+
     let query = supabase
-      .from('stock_indicators')
+      .from(tableName)
       .select('*');
 
     if (date) {
@@ -74,7 +81,7 @@ export class SupabaseService {
     limit = 10,
     direction: 'high' | 'low' = 'high'
   ): Promise<ExtremSymbol[]> {
-    const columnMap = {
+    const columnMap: Record<'rsi' | 'macd' | 'bollinger' | 'adx' | 'cmf', string> = {
       rsi: 'rsi_14_value',
       macd: 'macd_z_score',
       bollinger: 'bollinger_z_score',
@@ -82,7 +89,7 @@ export class SupabaseService {
       cmf: 'cmf_20_value'
     };
 
-    const extremeColumnMap = {
+    const extremeColumnMap: Record<'rsi' | 'macd' | 'bollinger' | 'adx' | 'cmf', string> = {
       rsi: 'rsi_14_extreme',
       macd: 'macd_extreme',
       bollinger: 'bollinger_z_extreme',
@@ -93,14 +100,25 @@ export class SupabaseService {
     const valueColumn = columnMap[indicator];
     const extremeColumn = extremeColumnMap[indicator];
 
+    const tableName = getStockIndicatorTable(exchange);
+
     // Build query and filter out null values
+    const selectColumns = [`symbol`, `company_name`, valueColumn, extremeColumn];
+    if (tableName !== 'stock_indicators_us') {
+      selectColumns.push('exchange');
+    }
+
     let query = supabase
-      .from<StockIndicatorRow>('stock_indicators')
-      .select(`symbol, company_name, exchange, ${valueColumn}, ${extremeColumn}`)
+      .from<StockIndicatorRow>(tableName)
+      .select(selectColumns.join(', '))
       .not(valueColumn, 'is', null);
 
     // Order by value
     query = query.order(valueColumn, { ascending: direction === 'low', nullsFirst: false });
+
+    if (exchange !== 'ALL' && tableName === 'stock_indicators') {
+      query = query.eq('exchange', exchange);
+    }
 
     const { data, error } = await query.limit(limit);
 
@@ -111,13 +129,18 @@ export class SupabaseService {
 
     const rows = (data ?? []) as StockIndicatorRow[];
 
-    return rows.map((item) => ({
-      ticker: item.symbol,
-      company_name: item.company_name,
-      value: Number(item[valueColumn] ?? 0),
-      extreme: (item[extremeColumn] as string | null) ?? null,
-      exchange: item.exchange,
-    }));
+    return rows.map((item) => {
+      const exchangeValue =
+        tableName === 'stock_indicators_us' ? 'US' : (item.exchange as string | undefined);
+
+      return {
+        ticker: item.symbol,
+        company_name: item.company_name,
+        value: Number(item[valueColumn] ?? 0),
+        extreme: (item[extremeColumn] as string | null) ?? null,
+        exchange: exchangeValue,
+      };
+    });
   }
 
   // Get OHLC price data
