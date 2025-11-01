@@ -36,17 +36,25 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   useEffect(() => {
     if (!chartContainerRef.current || !isOpen) return;
 
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#9ca3af',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 500,
+    // Small delay to ensure container is rendered and has dimensions
+    const timer = setTimeout(() => {
+      if (!chartContainerRef.current) return;
+
+      const container = chartContainerRef.current;
+      const containerWidth = container.clientWidth || 800;
+      const containerHeight = container.clientHeight || 500;
+
+      const chart = createChart(container, {
+        layout: {
+          background: { color: '#0a0a0a' },
+          textColor: '#9ca3af',
+        },
+        grid: {
+          vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+          horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        },
+        width: containerWidth,
+        height: containerHeight,
       timeScale: {
         borderColor: '#2B2B43',
         timeVisible: true,
@@ -77,24 +85,29 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
       wickDownColor: '#ef5350',
     });
 
-    chartRef.current = chart;
-    candlestickSeriesRef.current = candlestickSeries;
+      chartRef.current = chart;
+      candlestickSeriesRef.current = candlestickSeries;
 
-    // Handle resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
-      }
-    };
+      // Handle resize
+      const handleResize = () => {
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+          });
+        }
+      };
 
-    window.addEventListener('resize', handleResize);
+      window.addEventListener('resize', handleResize);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-    };
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        chart.remove();
+        chartRef.current = null;
+        candlestickSeriesRef.current = null;
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
   // Fetch OHLC data
@@ -107,17 +120,21 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
         const timeframe = TIMEFRAME_OPTIONS.find(tf => tf.value === selectedTimeframe);
         const days = timeframe?.days || 200;
 
+        console.log(`Fetching OHLC data for ${symbol} (${exchange}) - ${days} days`);
+
         const response = await fetch(
           `/api/chart/ohlc?symbol=${symbol}&exchange=${exchange}&limit=${days}`
         );
 
         if (!response.ok) {
+          console.error(`Failed to fetch OHLC: ${response.status}`);
           throw new Error('Failed to fetch OHLC data');
         }
 
         const result = await response.json();
+        console.log(`OHLC API response:`, result);
 
-        if (result.success && result.data) {
+        if (result.success && result.data && result.data.length > 0) {
           // Transform data for lightweight-charts
           const formattedData: CandlestickData[] = result.data.map((item: any) => ({
             time: item.time,
@@ -127,12 +144,18 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
             close: item.close,
           }));
 
+          console.log(`Setting ${formattedData.length} candles to chart`);
           setChartData(formattedData);
 
-          if (candlestickSeriesRef.current) {
+          if (candlestickSeriesRef.current && formattedData.length > 0) {
+            console.log('Updating chart with data');
             candlestickSeriesRef.current.setData(formattedData);
             chartRef.current?.timeScale().fitContent();
+          } else {
+            console.warn('Chart series not ready or no data');
           }
+        } else {
+          console.warn('No data in API response');
         }
 
         // Fetch company name from symbols table
@@ -211,13 +234,13 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           </div>
 
           {/* Chart Area */}
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 overflow-hidden relative bg-[#0a0a0a]">
             {loading && (
               <div className="absolute inset-0 bg-background/80 z-10 flex items-center justify-center">
                 <div className="text-sm text-muted-foreground">Loading chart data...</div>
               </div>
             )}
-            <div ref={chartContainerRef} className="w-full h-full p-4" />
+            <div ref={chartContainerRef} className="w-full h-full" style={{ minHeight: '500px' }} />
 
             {chartData.length === 0 && !loading && (
               <div className="absolute inset-0 flex items-center justify-center">
