@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { ExtremeCard } from '@/components/dashboard/extreme-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
-import { ChartPanel } from '@/components/chart/chart-panel';
+import { SimpleChartPanel } from '@/components/chart/simple-chart-panel';
 import { ExtremSymbol } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
@@ -187,14 +187,12 @@ export default function DashboardPage() {
       </Tabs>
 
       {/* Chart Panel */}
-      {selectedSymbol && (
-        <ChartPanel
-          symbol={selectedSymbol}
-          exchange={chartSymbolExchange}
-          isOpen={chartDrawerOpen}
-          onClose={handleCloseChart}
-        />
-      )}
+      <SimpleChartPanel
+        symbol={selectedSymbol || 'AAPL'}
+        exchange={chartSymbolExchange}
+        isOpen={chartDrawerOpen}
+        onClose={handleCloseChart}
+      />
     </div>
   );
 }
