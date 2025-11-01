@@ -18,6 +18,8 @@ interface AppStore extends AppState {
   setTableFilters: (filters: TableFilters) => void;
   setSelectedSymbol: (symbol: string | null) => void;
   setChartDrawerOpen: (open: boolean) => void;
+  setSelectedExchange: (exchange: AppState['selectedExchange']) => void;
+  setSelectedCategory: (category: AppState['selectedCategory']) => void;
 
   // Data Actions
   setStockIndicators: (indicators: StockIndicator[]) => void;
@@ -49,6 +51,8 @@ export const useAppStore = create<AppStore>((set) => ({
   tableFilters: initialFilters,
   selectedSymbol: null,
   chartDrawerOpen: false,
+  selectedExchange: 'ALL',
+  selectedCategory: 'all',
 
   // Data State
   stockIndicators: [],
@@ -68,6 +72,8 @@ export const useAppStore = create<AppStore>((set) => ({
   })),
   setSelectedSymbol: (symbol) => set({ selectedSymbol: symbol }),
   setChartDrawerOpen: (open) => set({ chartDrawerOpen: open }),
+  setSelectedExchange: (exchange) => set({ selectedExchange: exchange }),
+  setSelectedCategory: (category) => set({ selectedCategory: category }),
 
   // Data Actions
   setStockIndicators: (indicators) => set({ stockIndicators: indicators }),
@@ -78,5 +84,10 @@ export const useAppStore = create<AppStore>((set) => ({
   setError: (error) => set({ error: error }),
 
   // Utility Actions
-  resetFilters: () => set({ tableFilters: initialFilters }),
+  resetFilters: () => set({
+    tableFilters: initialFilters,
+    selectedExchange: 'ALL',
+    selectedCategory: 'all',
+    selectedTimeframe: '1D',
+  }),
 }));

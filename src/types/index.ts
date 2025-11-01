@@ -19,21 +19,45 @@ export interface Symbol {
 export interface StockIndicator {
   symbol: string;
   company_name: string;
+  exchange: string;
   as_of: string;
-  rsi_14_value: number;
+  // Momentum Indicators
+  rsi_14_value: number | null;
   rsi_14_extreme: string | null;
-  macd_value: number;
-  macd_z_score: number;
+  macd_value: number | null;
+  macd_z_score: number | null;
   macd_extreme: string | null;
-  bollinger_z_value: number;
-  bollinger_z_score: number;
-  bollinger_z_extreme: string | null;
-  bollinger_breakout_value: number;
-  bollinger_breakout_extreme: string | null;
-  adx_14_value: number;
+  cci: number | null;
+  stoch_rsi: number | null;
+  stochastic: number | null;
+  // Trend Indicators
+  adx_14_value: number | null;
   adx_14_extreme: string | null;
-  cmf_20_value: number;
+  sma: number | null;
+  sma_normalized: number | null;
+  wma: number | null;
+  wma_normalized: number | null;
+  slope: number | null;
+  slope_normalized: number | null;
+  // Volume Indicators
+  cmf_20_value: number | null;
   cmf_20_extreme: string | null;
+  avgvol: number | null;
+  avgvol_normalized: number | null;
+  avgvolccy: number | null;
+  avgvolccy_normalized: number | null;
+  // Volatility Indicators
+  bollinger_z_value: number | null;
+  bollinger_z_score: number | null;
+  bollinger_z_extreme: string | null;
+  bollinger_breakout_value: number | null;
+  bollinger_breakout_extreme: string | null;
+  atr: number | null;
+  atr_normalized: number | null;
+  stddev: number | null;
+  stddev_normalized: number | null;
+  // Other
+  beta: number | null;
   updated_at: string;
 }
 
@@ -142,11 +166,33 @@ export interface TableFilters {
 
 // App State Types
 export interface AppState {
-  selectedUniverse: 'NSE_FO' | 'NIFTY50' | 'NIFTY100' | 'CUSTOM';
-  selectedTimeframe: '1D' | '1W' | '1M' | '3M' | '6M' | '1Y';
+  selectedUniverse: 'NSE_FO' | 'NIFTY50' | 'NIFTY100' | 'US' | 'CUSTOM';
+  selectedTimeframe: '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | 'All';
   selectedDate: string;
   activeIndicator: string;
   tableFilters: TableFilters;
   selectedSymbol: string | null;
   chartDrawerOpen: boolean;
+  selectedExchange: 'NSE' | 'US' | 'ALL';
+  selectedCategory: 'all' | 'momentum' | 'trend' | 'volume' | 'volatility';
+}
+
+// Indicator Configuration
+export interface IndicatorConfig {
+  key: string;
+  name: string;
+  category: 'momentum' | 'trend' | 'volume' | 'volatility';
+  valueColumn: string;
+  extremeColumn?: string;
+  direction: 'high' | 'low';
+  title: string;
+  description: string;
+  unit?: string;
+  thresholds?: {
+    overbought?: number;
+    oversold?: number;
+    strong?: number;
+    weak?: number;
+  };
+  formatValue: (value: number) => string;
 }
