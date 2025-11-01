@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
+import type { ExtremSymbol } from '@/types';
+
+interface StockIndicatorRow {
+  symbol: string;
+  company_name: string;
+  exchange: string;
+  [key: string]: string | number | null;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,7 +39,7 @@ export async function GET(request: NextRequest) {
         }
 
         let query = supabase
-          .from('stock_indicators')
+          .from<StockIndicatorRow>('stock_indicators')
           .select(selectColumns.join(', '))
           .not(config.valueColumn, 'is', null);
 
@@ -54,13 +62,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Transform data to match ExtremSymbol interface
-        const transformedData = (data || []).map((item: any) => ({
+        const transformedData: ExtremSymbol[] = (data || []).map((item) => ({
           ticker: item.symbol,
           company_name: item.company_name,
-          value: item[config.valueColumn] || 0,
-          extreme: config.extremeColumn ? item[config.extremeColumn] : item.exchange,
+          value: Number(item[config.valueColumn] ?? 0),
+          extreme: config.extremeColumn ? (item[config.extremeColumn] as string | null) : item.exchange,
           exchange: item.exchange,
-          sparkline: [], // Will be populated with historical data in future enhancement
+          sparkline: [],
         }));
 
         return { key: config.key, data: transformedData };
@@ -71,7 +79,7 @@ export async function GET(request: NextRequest) {
     });
 
     const results = await Promise.all(promises);
-    const dataMap: Record<string, any[]> = {};
+    const dataMap: Record<string, ExtremSymbol[]> = {};
     results.forEach(({ key, data }) => {
       dataMap[key] = data;
     });

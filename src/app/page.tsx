@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { ExtremeCard } from '@/components/dashboard/extreme-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
@@ -9,6 +9,17 @@ import { ExtremSymbol } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+interface ExtremeDataMeta {
+  indicatorCount: number;
+  [key: string]: unknown;
+}
+
+interface ExtremeDataResponse {
+  success: boolean;
+  data: Record<string, ExtremSymbol[]>;
+  meta: ExtremeDataMeta;
+}
 
 export default function DashboardPage() {
   const {
@@ -22,14 +33,10 @@ export default function DashboardPage() {
     selectedCategory,
   } = useAppStore();
   const [extremeData, setExtremeData] = useState<Record<string, ExtremSymbol[]>>({});
-  const [meta, setMeta] = useState<any>(null);
+  const [meta, setMeta] = useState<ExtremeDataMeta | null>(null);
   const [chartSymbolExchange, setChartSymbolExchange] = useState<string>('NSE');
 
-  useEffect(() => {
-    loadExtremeData();
-  }, [selectedExchange, selectedCategory]);
-
-  const loadExtremeData = async () => {
+  const loadExtremeData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -42,7 +49,7 @@ export default function DashboardPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
-      const result = await response.json();
+      const result: ExtremeDataResponse = await response.json();
       if (result.success) {
         setExtremeData(result.data);
         setMeta(result.meta);
@@ -52,7 +59,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory, selectedExchange, setLoading]);
+
+  useEffect(() => {
+    loadExtremeData();
+  }, [loadExtremeData]);
 
   const handleSymbolClick = (symbol: string, exchange?: string) => {
     setSelectedSymbol(symbol);

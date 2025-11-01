@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type {
+  CandlestickData,
+  HistogramData,
+  IChartApi,
+  ISeriesApi,
+} from 'lightweight-charts';
 
 interface ChartPanelProps {
   symbol: string;
@@ -22,22 +28,36 @@ const TIMEFRAME_OPTIONS = [
   { value: '1Y', label: '1Y', days: 365 },
 ];
 
+type CandlestickWithVolume = CandlestickData & { volume?: number | null };
+
+interface OhlcApiResponse {
+  success: boolean;
+  data: CandlestickWithVolume[];
+  meta?: Record<string, unknown>;
+}
+
+interface SymbolInfoResponse {
+  data?: {
+    company_name?: string;
+  };
+}
+
 export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartPanelProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
-  const candlestickSeriesRef = useRef<any>(null);
-  const volumeSeriesRef = useRef<any>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState('200D');
   const [loading, setLoading] = useState(false);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<CandlestickWithVolume[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [containerMounted, setContainerMounted] = useState(false);
 
   // Track when container ref is set and initialize chart immediately
   const setChartContainerRef = (node: HTMLDivElement | null) => {
-    (chartContainerRef as any).current = node;
+    chartContainerRef.current = node;
 
     if (node && isOpen && !chartRef.current) {
       console.log('[REF] Container ref set, initializing chart immediately...');
@@ -82,16 +102,16 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           const candlestickDefinition =
             lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
 
-          let candlestickSeries: any = null;
+          let candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
 
           if (chart.addSeries && candlestickDefinition) {
-            candlestickSeries = chart.addSeries(candlestickDefinition, {
+            candlestickSeries = chart.addSeries(candlestickDefinition as never, {
               upColor: '#10b981',
               downColor: '#ef4444',
               borderVisible: false,
               wickUpColor: '#10b981',
               wickDownColor: '#ef4444',
-            });
+            }) as ISeriesApi<'Candlestick'>;
           } else if (typeof chart.addCandlestickSeries === 'function') {
             candlestickSeries = chart.addCandlestickSeries({
               upColor: '#10b981',
@@ -99,7 +119,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
               borderVisible: false,
               wickUpColor: '#10b981',
               wickDownColor: '#ef4444',
-            });
+            }) as ISeriesApi<'Candlestick'>;
           } else {
             throw new Error('No candlestick series API available on chart instance');
           }
@@ -107,20 +127,20 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           const histogramDefinition =
             lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
 
-          let histogramSeries: any = null;
+          let histogramSeries: ISeriesApi<'Histogram'> | null = null;
 
           if (chart.addSeries && histogramDefinition) {
-            histogramSeries = chart.addSeries(histogramDefinition, {
+            histogramSeries = chart.addSeries(histogramDefinition as never, {
               priceFormat: { type: 'volume' },
               priceScaleId: '',
               color: '#2563eb',
-            });
+            }) as ISeriesApi<'Histogram'>;
           } else if (typeof chart.addHistogramSeries === 'function') {
             histogramSeries = chart.addHistogramSeries({
               priceFormat: { type: 'volume' },
               priceScaleId: '',
               color: '#2563eb',
-            });
+            }) as ISeriesApi<'Histogram'>;
           }
 
           if (chart.priceScale && typeof chart.priceScale === 'function') {
@@ -151,7 +171,16 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           // If data is already loaded, set it now
           if (chartData.length > 0) {
             console.log('[INIT] Data already loaded, setting to chart...');
-            candlestickSeries.setData(chartData);
+            const candleData: CandlestickData[] = chartData.map(
+              ({ time, open, high, low, close }) => ({
+                time,
+                open,
+                high,
+                low,
+                close,
+              })
+            );
+            candlestickSeries.setData(candleData);
             chart.timeScale().fitContent();
           }
         } catch (error) {
@@ -171,12 +200,12 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
         resizeObserverRef.current.disconnect();
         resizeObserverRef.current = null;
       }
-          if (chartRef.current) {
-            chartRef.current.remove();
-            chartRef.current = null;
-            candlestickSeriesRef.current = null;
-            volumeSeriesRef.current = null;
-          }
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        candlestickSeriesRef.current = null;
+        volumeSeriesRef.current = null;
+      }
       setContainerMounted(false);
       setChartData([]);
     }
@@ -200,11 +229,11 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
         ]);
 
         if (ohlcRes.ok) {
-          const result = await ohlcRes.json();
+          const result: OhlcApiResponse = await ohlcRes.json();
           console.log(`[DATA] Got ${result.data?.length || 0} candles`);
 
           if (result.success && result.data && result.data.length > 0) {
-            const formattedData = result.data.map((item: any) => ({
+            const formattedData: CandlestickWithVolume[] = result.data.map((item) => ({
               time: item.time,
               open: item.open,
               high: item.high,
@@ -219,18 +248,19 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
             const setDataToChart = (retries = 0) => {
               if (candlestickSeriesRef.current) {
                 console.log('[DATA] Setting data to chart...');
-                candlestickSeriesRef.current.setData(
-                  formattedData.map(({ time, open, high, low, close }) => ({
+                const candleData: CandlestickData[] = formattedData.map(
+                  ({ time, open, high, low, close }) => ({
                     time,
                     open,
                     high,
                     low,
                     close,
-                  }))
+                  })
                 );
+                candlestickSeriesRef.current.setData(candleData);
 
                 if (volumeSeriesRef.current) {
-                  const volumeData = formattedData.map(({ time, volume, open, close }) => ({
+                  const volumeData: HistogramData[] = formattedData.map(({ time, volume, open, close }) => ({
                     time,
                     value: volume ?? 0,
                     color: close >= open ? '#10b981' : '#ef4444',
@@ -254,7 +284,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
         }
 
         if (symbolRes.ok) {
-          const symbolData = await symbolRes.json();
+          const symbolData: SymbolInfoResponse = await symbolRes.json();
           setCompanyName(symbolData.data?.company_name || '');
         }
       } catch (error) {

@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Search, Calendar, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { AppState } from '@/types';
 
 const universeOptions = [
   { value: 'NSE_FO', label: 'NSE F&O' },
@@ -42,6 +43,10 @@ export function TopBar() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleUniverseChange = (value: string) =>
+    setUniverse(value as AppState['selectedUniverse']);
+  const handleTimeframeChange = (value: string) =>
+    setTimeframe(value as AppState['selectedTimeframe']);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -65,7 +70,7 @@ export function TopBar() {
         </div>
 
         {/* Universe Selector */}
-        <Select value={selectedUniverse} onValueChange={setUniverse as any}>
+        <Select value={selectedUniverse} onValueChange={handleUniverseChange}>
           <SelectTrigger className="w-32 bg-surface border-input">
             <SelectValue />
           </SelectTrigger>
@@ -79,7 +84,7 @@ export function TopBar() {
         </Select>
 
         {/* Timeframe Selector */}
-        <Select value={selectedTimeframe} onValueChange={setTimeframe as any}>
+        <Select value={selectedTimeframe} onValueChange={handleTimeframeChange}>
           <SelectTrigger className="w-28 bg-surface border-input">
             <SelectValue />
           </SelectTrigger>

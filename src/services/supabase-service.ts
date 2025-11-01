@@ -9,6 +9,13 @@ import {
   ExtremSymbol
 } from '@/types';
 
+interface StockIndicatorRow {
+  symbol: string;
+  company_name: string;
+  exchange: string;
+  [key: string]: string | number | null;
+}
+
 export class SupabaseService {
   // Fetch all symbols
   static async getSymbols(): Promise<Symbol[]> {
@@ -88,7 +95,7 @@ export class SupabaseService {
 
     // Build query and filter out null values
     let query = supabase
-      .from('stock_indicators')
+      .from<StockIndicatorRow>('stock_indicators')
       .select(`symbol, company_name, exchange, ${valueColumn}, ${extremeColumn}`)
       .not(valueColumn, 'is', null);
 
@@ -102,11 +109,13 @@ export class SupabaseService {
       return [];
     }
 
-    return (data || []).map(item => ({
+    const rows = (data ?? []) as StockIndicatorRow[];
+
+    return rows.map((item) => ({
       ticker: item.symbol,
       company_name: item.company_name,
-      value: item[valueColumn] || 0,
-      extreme: item[extremeColumn],
+      value: Number(item[valueColumn] ?? 0),
+      extreme: (item[extremeColumn] as string | null) ?? null,
       exchange: item.exchange,
     }));
   }
@@ -252,7 +261,7 @@ export class SupabaseService {
   static async saveChartLayout(
     userId: string,
     name: string,
-    layout: any
+    layout: unknown
   ): Promise<ChartLayout> {
     const { data, error } = await supabase
       .from('chart_layouts')

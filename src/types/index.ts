@@ -116,7 +116,7 @@ export interface ChartLayout {
   id: string;
   user_id: string;
   name: string;
-  layout_json: any;
+  layout_json: unknown;
   created_at: string;
 }
 

@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from 'react';
 
+type ExtremeDataTestResponse = {
+  data: Record<string, unknown>;
+};
+
 export default function TestPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/extreme-data')
-      .then((res) => res.json())
+      .then((res) => res.json() as Promise<ExtremeDataTestResponse>)
       .then((result) => {
-        setData(result.data);
+        setData(result.data ?? null);
         setLoading(false);
       })
       .catch((err) => {

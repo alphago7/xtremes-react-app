@@ -12,6 +12,24 @@ interface OHLCData {
   volume?: number;
 }
 
+interface EodhdResponseEntry {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
+
+interface OhlcRow {
+  trading_date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number | null;
+}
+
 async function fetchFromEODHD(symbol: string, exchange: string, limit: number): Promise<OHLCData[]> {
   try {
     const today = new Date();
@@ -30,14 +48,14 @@ async function fetchFromEODHD(symbol: string, exchange: string, limit: number): 
       return [];
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as EodhdResponseEntry[] | undefined;
 
     if (!Array.isArray(data)) {
       return [];
     }
 
     // Transform to our format and limit to requested number
-    return data.slice(-limit).map((item: any) => ({
+    return data.slice(-limit).map((item) => ({
       time: item.date,
       open: item.open,
       high: item.high,
@@ -76,23 +94,27 @@ export async function GET(request: NextRequest) {
 
     // Try to fetch from database first
     const { data: dbData, error: dbError } = await supabase
-      .from('ohlc_prices')
+      .from<OhlcRow>('ohlc_prices')
       .select('trading_date, open, high, low, close, volume')
       .eq('symbol', symbol)
       .eq('exchange', exchange)
       .order('trading_date', { ascending: true });
 
+    if (dbError) {
+      console.error('Supabase OHLC fetch error:', dbError);
+    }
+
     let ohlcData: OHLCData[] = [];
 
     if (dbData && dbData.length > 0) {
       // Transform database data to chart format
-      ohlcData = dbData.map((item: any) => ({
+      ohlcData = dbData.map((item) => ({
         time: item.trading_date,
         open: item.open,
         high: item.high,
         low: item.low,
         close: item.close,
-        volume: item.volume,
+        volume: item.volume ?? undefined,
       }));
 
       // Take last N records

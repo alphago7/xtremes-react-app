@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type {
+  CandlestickData,
+  HistogramData,
+  IChartApi,
+  ISeriesApi,
+} from 'lightweight-charts';
 
 interface SimpleChartPanelProps {
   symbol: string;
@@ -22,18 +28,38 @@ const TIMEFRAMES = [
   { value: '1Y', days: 365 },
 ];
 
+type CandlestickWithVolume = CandlestickData & { volume?: number | null };
+
+interface ChartInstance {
+  chart: IChartApi;
+  series: ISeriesApi<'Candlestick'>;
+  volumeSeries?: ISeriesApi<'Histogram'>;
+}
+
+interface OhlcApiResponse {
+  success: boolean;
+  data: CandlestickWithVolume[];
+  meta?: Record<string, unknown>;
+}
+
+interface SymbolInfoResponse {
+  data?: {
+    company_name?: string;
+  };
+}
+
 export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: SimpleChartPanelProps) {
   const chartDivRef = useRef<HTMLDivElement | null>(null);
-  const chartInstanceRef = useRef<{ chart: any; series: any; volumeSeries?: any } | null>(null);
-  const latestDataRef = useRef<any[]>([]);
+  const chartInstanceRef = useRef<ChartInstance | null>(null);
+  const latestDataRef = useRef<CandlestickWithVolume[]>([]);
   const [timeframe, setTimeframe] = useState('200D');
-  const [ohlcData, setOhlcData] = useState<any[]>([]);
+  const [ohlcData, setOhlcData] = useState<CandlestickWithVolume[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [chartContainerReady, setChartContainerReady] = useState(false);
   const hasRegisteredContainerRef = useRef(false);
 
-  const applyDataToChart = (data: any[]) => {
+  const applyDataToChart = (data: CandlestickWithVolume[]) => {
     const instance = chartInstanceRef.current;
     if (!instance?.series) {
       return false;
@@ -49,7 +75,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
     instance.series.setData(candleData);
 
     if (instance.volumeSeries) {
-      const volumeData = data.map(({ time, volume, open, close }) => ({
+      const volumeData: HistogramData[] = data.map(({ time, volume, open, close }) => ({
         time,
         value: volume ?? 0,
         color: close >= open ? '#10b981' : '#ef4444',
@@ -145,15 +171,15 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
         const candlestickDefinition =
           lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
 
-        let series: any = null;
+        let series: ISeriesApi<'Candlestick'> | null = null;
         if (chart.addSeries && candlestickDefinition) {
-          series = chart.addSeries(candlestickDefinition, {
+          series = chart.addSeries(candlestickDefinition as never, {
             upColor: '#10b981',
             downColor: '#ef4444',
             borderVisible: false,
             wickUpColor: '#10b981',
             wickDownColor: '#ef4444',
-          });
+          }) as ISeriesApi<'Candlestick'>;
         } else if (typeof chart.addCandlestickSeries === 'function') {
           series = chart.addCandlestickSeries({
             upColor: '#10b981',
@@ -161,28 +187,28 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
             borderVisible: false,
             wickUpColor: '#10b981',
             wickDownColor: '#ef4444',
-          });
+          }) as ISeriesApi<'Candlestick'>;
         } else {
           throw new Error('No candlestick series API available on chart instance');
         }
 
-        let volumeSeries: any = null;
+        let volumeSeries: ISeriesApi<'Histogram'> | null = null;
         const histogramDefinition =
           lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
 
         if (chart.addSeries && histogramDefinition) {
-          volumeSeries = chart.addSeries(histogramDefinition, {
+          volumeSeries = chart.addSeries(histogramDefinition as never, {
             priceFormat: { type: 'volume' },
             priceScaleId: '',
             color: '#2563eb',
             baseLineColor: '#2563eb',
-          });
+          }) as ISeriesApi<'Histogram'>;
         } else if (typeof chart.addHistogramSeries === 'function') {
           volumeSeries = chart.addHistogramSeries({
             priceFormat: { type: 'volume' },
             priceScaleId: '',
             color: '#2563eb',
-          });
+          }) as ISeriesApi<'Histogram'>;
         }
 
         if (chart.priceScale && typeof chart.priceScale === 'function') {
@@ -266,9 +292,10 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
         ]);
 
         if (ohlcRes.ok) {
-          const result = await ohlcRes.json();
+          const result: OhlcApiResponse = await ohlcRes.json();
           if (result.success && result.data) {
-            const data = result.data.map((d: any) => ({
+            const responseData = result.data ?? [];
+            const data: CandlestickWithVolume[] = responseData.map((d) => ({
               time: d.time,
               open: d.open,
               high: d.high,
@@ -289,7 +316,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
         }
 
         if (infoRes.ok) {
-          const info = await infoRes.json();
+          const info: SymbolInfoResponse = await infoRes.json();
           setCompanyName(info.data?.company_name || '');
         }
       } catch (err) {
