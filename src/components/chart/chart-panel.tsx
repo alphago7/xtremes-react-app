@@ -24,7 +24,6 @@ const TIMEFRAME_OPTIONS = [
 ];
 
 export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartPanelProps) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState('200D');
@@ -33,19 +32,15 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const [companyName, setCompanyName] = useState('');
   const [chartReady, setChartReady] = useState(false);
 
-  // Initialize chart
-  useEffect(() => {
-    if (!chartContainerRef.current || !isOpen) return;
+  // Callback ref to initialize chart when container is ready
+  const chartContainerRef = (node: HTMLDivElement | null) => {
+    if (!node || !isOpen || chartRef.current) return;
 
-    // Small delay to ensure container is rendered and has dimensions
-    const timer = setTimeout(() => {
-      if (!chartContainerRef.current) return;
+    console.log('Chart container mounted, initializing...');
+    console.log('Container dimensions:', node.clientWidth, 'x', node.clientHeight);
 
-      const container = chartContainerRef.current;
-      const containerWidth = container.clientWidth || 800;
-      const containerHeight = container.clientHeight || 500;
-
-      const chart = createChart(container, {
+    try {
+      const chart = createChart(node, {
         layout: {
           background: { color: '#0a0a0a' },
           textColor: '#9ca3af',
@@ -54,65 +49,71 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
           horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
         },
-        width: containerWidth,
-        height: containerHeight,
-      timeScale: {
-        borderColor: '#2B2B43',
-        timeVisible: true,
-      },
-      rightPriceScale: {
-        borderColor: '#2B2B43',
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          width: 1,
-          color: 'rgba(255, 255, 255, 0.3)',
-          style: 2,
+        width: node.clientWidth || 800,
+        height: 500,
+        timeScale: {
+          borderColor: '#2B2B43',
+          timeVisible: true,
         },
-        horzLine: {
-          width: 1,
-          color: 'rgba(255, 255, 255, 0.3)',
-          style: 2,
+        rightPriceScale: {
+          borderColor: '#2B2B43',
         },
-      },
-    });
+        crosshair: {
+          mode: 1,
+          vertLine: {
+            width: 1,
+            color: 'rgba(255, 255, 255, 0.3)',
+            style: 2,
+          },
+          horzLine: {
+            width: 1,
+            color: 'rgba(255, 255, 255, 0.3)',
+            style: 2,
+          },
+        },
+      });
 
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-    });
+      console.log('Chart created, adding candlestick series');
+
+      const candlestickSeries = chart.addCandlestickSeries({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderVisible: false,
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350',
+      });
 
       chartRef.current = chart;
       candlestickSeriesRef.current = candlestickSeries;
 
-      console.log('Chart initialized successfully');
+      console.log('Chart initialized successfully ✅');
       setChartReady(true);
 
       // Handle resize
       const handleResize = () => {
-        if (chartContainerRef.current && chartRef.current) {
-          chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth,
+        if (chart) {
+          chart.applyOptions({
+            width: node.clientWidth,
           });
         }
       };
 
       window.addEventListener('resize', handleResize);
-    }, 100);
+    } catch (error) {
+      console.error('Error initializing chart:', error);
+    }
+  };
 
-    return () => {
+  // Cleanup on close
+  useEffect(() => {
+    if (!isOpen && chartRef.current) {
+      console.log('Panel closed, cleaning up chart');
+      chartRef.current.remove();
+      chartRef.current = null;
+      candlestickSeriesRef.current = null;
       setChartReady(false);
-      if (chartRef.current) {
-        window.removeEventListener('resize', () => {});
-        chartRef.current.remove();
-        chartRef.current = null;
-        candlestickSeriesRef.current = null;
-      }
-    };
+      setChartData([]);
+    }
   }, [isOpen]);
 
   // Fetch OHLC data - only after chart is ready
@@ -256,7 +257,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
               <div>Loading: {loading ? 'Yes' : 'No'}</div>
             </div>
 
-            <div ref={chartContainerRef} className="w-full h-full" style={{ minHeight: '500px' }} />
+            <div ref={chartContainerRef} className="w-full h-full" style={{ height: '500px' }} />
 
             {chartData.length === 0 && !loading && chartReady && (
               <div className="absolute inset-0 flex items-center justify-center">
