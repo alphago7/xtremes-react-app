@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { ExtremeCard } from '@/components/dashboard/extreme-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
+import { ChartPanel } from '@/components/chart/chart-panel';
 import { ExtremSymbol } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
@@ -11,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function DashboardPage() {
   const {
+    selectedSymbol,
+    chartDrawerOpen,
     setSelectedSymbol,
     setChartDrawerOpen,
     setLoading,
@@ -20,6 +23,7 @@ export default function DashboardPage() {
   } = useAppStore();
   const [extremeData, setExtremeData] = useState<Record<string, ExtremSymbol[]>>({});
   const [meta, setMeta] = useState<any>(null);
+  const [chartSymbolExchange, setChartSymbolExchange] = useState<string>('NSE');
 
   useEffect(() => {
     loadExtremeData();
@@ -50,9 +54,16 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSymbolClick = (symbol: string) => {
+  const handleSymbolClick = (symbol: string, exchange?: string) => {
     setSelectedSymbol(symbol);
+    setChartSymbolExchange(exchange || selectedExchange === 'ALL' ? 'NSE' : selectedExchange);
     setChartDrawerOpen(true);
+  };
+
+  const handleCloseChart = () => {
+    setChartDrawerOpen(false);
+    // Keep symbol selected for a moment before clearing
+    setTimeout(() => setSelectedSymbol(null), 300);
   };
 
   // Filter configs based on selected category
@@ -174,6 +185,16 @@ export default function DashboardPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Chart Panel */}
+      {selectedSymbol && (
+        <ChartPanel
+          symbol={selectedSymbol}
+          exchange={chartSymbolExchange}
+          isOpen={chartDrawerOpen}
+          onClose={handleCloseChart}
+        />
+      )}
     </div>
   );
 }
