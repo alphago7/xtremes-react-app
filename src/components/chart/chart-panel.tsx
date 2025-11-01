@@ -26,6 +26,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
+  const volumeSeriesRef = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState('200D');
@@ -48,11 +49,16 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           console.log('[INIT] Container dimensions:', node.clientWidth, 'x', node.clientHeight);
           console.log('[INIT] Loading lightweight-charts...');
 
-          const { createChart } = await import('lightweight-charts');
+          const lightweightCharts = await import('lightweight-charts');
+          const createChartFn = lightweightCharts.createChart || lightweightCharts.default?.createChart;
+
+          if (!createChartFn) {
+            throw new Error('lightweight-charts createChart function not found');
+          }
           console.log('[INIT] lightweight-charts loaded ✅');
 
           console.log('[INIT] Creating chart instance...');
-          const chart = createChart(node, {
+          const chart = createChartFn(node, {
             layout: {
               background: { color: '#0a0a0a' },
               textColor: '#d1d5db',
@@ -73,16 +79,63 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           });
 
           console.log('[INIT] Adding candlestick series...');
-          const candlestickSeries = chart.addCandlestickSeries({
-            upColor: '#10b981',
-            downColor: '#ef4444',
-            borderVisible: false,
-            wickUpColor: '#10b981',
-            wickDownColor: '#ef4444',
-          });
+          const candlestickDefinition =
+            lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
+
+          let candlestickSeries: any = null;
+
+          if (chart.addSeries && candlestickDefinition) {
+            candlestickSeries = chart.addSeries(candlestickDefinition, {
+              upColor: '#10b981',
+              downColor: '#ef4444',
+              borderVisible: false,
+              wickUpColor: '#10b981',
+              wickDownColor: '#ef4444',
+            });
+          } else if (typeof chart.addCandlestickSeries === 'function') {
+            candlestickSeries = chart.addCandlestickSeries({
+              upColor: '#10b981',
+              downColor: '#ef4444',
+              borderVisible: false,
+              wickUpColor: '#10b981',
+              wickDownColor: '#ef4444',
+            });
+          } else {
+            throw new Error('No candlestick series API available on chart instance');
+          }
+
+          const histogramDefinition =
+            lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
+
+          let histogramSeries: any = null;
+
+          if (chart.addSeries && histogramDefinition) {
+            histogramSeries = chart.addSeries(histogramDefinition, {
+              priceFormat: { type: 'volume' },
+              priceScaleId: '',
+              color: '#2563eb',
+            });
+          } else if (typeof chart.addHistogramSeries === 'function') {
+            histogramSeries = chart.addHistogramSeries({
+              priceFormat: { type: 'volume' },
+              priceScaleId: '',
+              color: '#2563eb',
+            });
+          }
+
+          if (chart.priceScale && typeof chart.priceScale === 'function') {
+            const volumeScale = chart.priceScale('');
+            volumeScale?.applyOptions?.({
+              scaleMargins: {
+                top: 0.8,
+                bottom: 0,
+              },
+            });
+          }
 
           chartRef.current = chart;
           candlestickSeriesRef.current = candlestickSeries;
+          volumeSeriesRef.current = histogramSeries;
 
           console.log('[INIT] Chart ready! ✅');
 
@@ -118,11 +171,12 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
         resizeObserverRef.current.disconnect();
         resizeObserverRef.current = null;
       }
-      if (chartRef.current) {
-        chartRef.current.remove();
-        chartRef.current = null;
-        candlestickSeriesRef.current = null;
-      }
+          if (chartRef.current) {
+            chartRef.current.remove();
+            chartRef.current = null;
+            candlestickSeriesRef.current = null;
+            volumeSeriesRef.current = null;
+          }
       setContainerMounted(false);
       setChartData([]);
     }
@@ -156,6 +210,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
               high: item.high,
               low: item.low,
               close: item.close,
+              volume: item.volume ?? 0,
             }));
 
             setChartData(formattedData);
@@ -164,7 +219,26 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
             const setDataToChart = (retries = 0) => {
               if (candlestickSeriesRef.current) {
                 console.log('[DATA] Setting data to chart...');
-                candlestickSeriesRef.current.setData(formattedData);
+                candlestickSeriesRef.current.setData(
+                  formattedData.map(({ time, open, high, low, close }) => ({
+                    time,
+                    open,
+                    high,
+                    low,
+                    close,
+                  }))
+                );
+
+                if (volumeSeriesRef.current) {
+                  const volumeData = formattedData.map(({ time, volume, open, close }) => ({
+                    time,
+                    value: volume ?? 0,
+                    color: close >= open ? '#10b981' : '#ef4444',
+                  }));
+
+                  volumeSeriesRef.current.setData(volumeData);
+                }
+
                 chartRef.current?.timeScale().fitContent();
                 console.log('[DATA] Chart updated ✅');
               } else if (retries < 5) {

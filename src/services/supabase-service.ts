@@ -89,7 +89,7 @@ export class SupabaseService {
     // Build query and filter out null values
     let query = supabase
       .from('stock_indicators')
-      .select(`symbol, company_name, ${valueColumn}, ${extremeColumn}`)
+      .select(`symbol, company_name, exchange, ${valueColumn}, ${extremeColumn}`)
       .not(valueColumn, 'is', null);
 
     // Order by value
@@ -106,7 +106,8 @@ export class SupabaseService {
       ticker: item.symbol,
       company_name: item.company_name,
       value: item[valueColumn] || 0,
-      extreme: item[extremeColumn]
+      extreme: item[extremeColumn],
+      exchange: item.exchange,
     }));
   }
 

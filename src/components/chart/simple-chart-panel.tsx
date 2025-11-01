@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,33 +24,80 @@ const TIMEFRAMES = [
 
 export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: SimpleChartPanelProps) {
   const chartDivRef = useRef<HTMLDivElement | null>(null);
-  const chartInstanceRef = useRef<any | null>(null);
+  const chartInstanceRef = useRef<{ chart: any; series: any; volumeSeries?: any } | null>(null);
+  const latestDataRef = useRef<any[]>([]);
   const [timeframe, setTimeframe] = useState('200D');
   const [ohlcData, setOhlcData] = useState<any[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [chartContainerReady, setChartContainerReady] = useState(false);
+  const hasRegisteredContainerRef = useRef(false);
 
-  // Callback ref to know when div is mounted
-  const setChartDivRef = (node: HTMLDivElement | null) => {
-    chartDivRef.current = node;
-    if (node && !chartContainerReady) {
-      console.log('📍 Chart div mounted');
-      setChartContainerReady(true);
+  const applyDataToChart = (data: any[]) => {
+    const instance = chartInstanceRef.current;
+    if (!instance?.series) {
+      return false;
     }
+
+    const candleData = data.map(({ time, open, high, low, close }) => ({
+      time,
+      open,
+      high,
+      low,
+      close,
+    }));
+    instance.series.setData(candleData);
+
+    if (instance.volumeSeries) {
+      const volumeData = data.map(({ time, volume, open, close }) => ({
+        time,
+        value: volume ?? 0,
+        color: close >= open ? '#10b981' : '#ef4444',
+      }));
+
+      instance.volumeSeries.setData(volumeData);
+    }
+
+    instance.chart.timeScale().fitContent();
+    return true;
   };
 
-  // Initialize chart once container is ready
+  // Callback ref to know when div is mounted
+  const setChartDivRef = useCallback((node: HTMLDivElement | null) => {
+    if (chartDivRef.current === node) {
+      return;
+    }
+
+    chartDivRef.current = node;
+
+    if (node) {
+      console.log('📍 Chart div mounted');
+      if (!hasRegisteredContainerRef.current) {
+        hasRegisteredContainerRef.current = true;
+        setChartContainerReady(true);
+      }
+    } else {
+      hasRegisteredContainerRef.current = false;
+      setChartContainerReady(false);
+    }
+  }, []);
+
+  // Initialize chart whenever the sheet is open and the container is ready
   useEffect(() => {
-    if (!chartContainerReady || !chartDivRef.current || chartInstanceRef.current) {
-      console.log('⏸️ Waiting...', { chartContainerReady, hasDiv: !!chartDivRef.current, hasChart: !!chartInstanceRef.current });
+    if (!isOpen || !chartContainerReady || !chartDivRef.current || chartInstanceRef.current) {
+      console.log('⏸️ Waiting...', {
+        chartContainerReady,
+        hasDiv: !!chartDivRef.current,
+        hasChart: !!chartInstanceRef.current,
+        isOpen,
+      });
       return;
     }
 
     console.log('🚀 Starting chart initialization...');
 
-    let chart: any = null;
-    let series: any = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let cancelled = false;
 
     const init = async () => {
       const div = chartDivRef.current;
@@ -61,12 +108,21 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
 
       try {
         console.log('📦 Loading lightweight-charts...');
-        const { createChart } = await import('lightweight-charts');
+        const lightweightCharts = await import('lightweight-charts');
+        if (cancelled) {
+          return;
+        }
+        const createChartFn =
+          lightweightCharts.createChart || lightweightCharts.default?.createChart;
+
+        if (!createChartFn) {
+          throw new Error('lightweight-charts createChart function not found');
+        }
         console.log('✅ Library loaded');
 
         console.log('🎨 Creating chart...');
 
-        chart = createChart(div, {
+        const chart = createChartFn(div, {
           width: div.clientWidth || 800,
           height: 500,
           layout: {
@@ -86,25 +142,85 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
           },
         });
 
-        series = chart.addCandlestickSeries({
-          upColor: '#10b981',
-          downColor: '#ef4444',
-          borderVisible: false,
-          wickUpColor: '#10b981',
-          wickDownColor: '#ef4444',
-        });
+        const candlestickDefinition =
+          lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
 
-        chartInstanceRef.current = { chart, series };
+        let series: any = null;
+        if (chart.addSeries && candlestickDefinition) {
+          series = chart.addSeries(candlestickDefinition, {
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+          });
+        } else if (typeof chart.addCandlestickSeries === 'function') {
+          series = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+          });
+        } else {
+          throw new Error('No candlestick series API available on chart instance');
+        }
+
+        let volumeSeries: any = null;
+        const histogramDefinition =
+          lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
+
+        if (chart.addSeries && histogramDefinition) {
+          volumeSeries = chart.addSeries(histogramDefinition, {
+            priceFormat: { type: 'volume' },
+            priceScaleId: '',
+            color: '#2563eb',
+            baseLineColor: '#2563eb',
+          });
+        } else if (typeof chart.addHistogramSeries === 'function') {
+          volumeSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: '',
+            color: '#2563eb',
+          });
+        }
+
+        if (chart.priceScale && typeof chart.priceScale === 'function') {
+          const volumeScale = chart.priceScale('');
+          volumeScale?.applyOptions?.({
+            scaleMargins: {
+              top: 0.8,
+              bottom: 0,
+            },
+          });
+        }
+
+        if (cancelled) {
+          chart.remove();
+          return;
+        }
+
+        chartInstanceRef.current = {
+          chart,
+          series,
+          volumeSeries: volumeSeries || undefined,
+        };
+
+        if (latestDataRef.current.length > 0) {
+          applyDataToChart(latestDataRef.current);
+        }
+
         console.log('✅✅✅ Chart initialized successfully!');
 
-        // Resize handler
-        const resizeObserver = new ResizeObserver(() => {
+        resizeObserver = new ResizeObserver(() => {
           if (chart && div) {
             chart.applyOptions({ width: div.clientWidth });
           }
         });
 
-        resizeObserver.observe(div);
+        if (!cancelled) {
+          resizeObserver.observe(div);
+        }
       } catch (err) {
         console.error('❌ Chart init error:', err);
       }
@@ -114,12 +230,26 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
 
     return () => {
       console.log('🧹 Cleaning up chart...');
-      if (chartInstanceRef.current?.chart) {
-        chartInstanceRef.current.chart.remove();
+      cancelled = true;
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+      const instance = chartInstanceRef.current;
+      if (instance?.chart) {
+        instance.chart.remove();
         chartInstanceRef.current = null;
       }
     };
-  }, [chartContainerReady]); // Run when container becomes ready
+  }, [chartContainerReady, isOpen]); // Re-run when sheet opens/closes
+
+  useEffect(() => {
+    if (ohlcData.length === 0) {
+      return;
+    }
+
+    applyDataToChart(ohlcData);
+  }, [ohlcData]);
 
   // Fetch data when symbol/timeframe changes
   useEffect(() => {
@@ -144,15 +274,16 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
               high: d.high,
               low: d.low,
               close: d.close,
+              volume: d.volume ?? 0,
             }));
 
+            latestDataRef.current = data;
             setOhlcData(data);
 
-            // Update chart
-            if (chartInstanceRef.current?.series) {
-              chartInstanceRef.current.series.setData(data);
-              chartInstanceRef.current.chart.timeScale().fitContent();
+            if (applyDataToChart(data)) {
               console.log(`✅ Set ${data.length} candles`);
+            } else {
+              console.log('ℹ️ Chart not ready yet; data will be applied once initialized');
             }
           }
         }
@@ -177,7 +308,14 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
     : 0;
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
       <SheetContent side="right" className="w-full sm:max-w-4xl lg:max-w-6xl p-0">
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -209,6 +347,12 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
                 key={tf.value}
                 size="sm"
                 variant={timeframe === tf.value ? 'default' : 'outline'}
+                className={cn(
+                  'min-w-[64px] transition-colors',
+                  timeframe === tf.value
+                    ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/20'
+                )}
                 onClick={() => setTimeframe(tf.value)}
               >
                 {tf.value}

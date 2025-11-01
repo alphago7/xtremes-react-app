@@ -19,9 +19,20 @@ export async function GET(request: NextRequest) {
     const promises = filteredConfigs.map(async (config) => {
       try {
         // Build query
+        const selectColumns = [
+          'symbol',
+          'company_name',
+          'exchange',
+          config.valueColumn,
+        ];
+
+        if (config.extremeColumn) {
+          selectColumns.push(config.extremeColumn);
+        }
+
         let query = supabase
           .from('stock_indicators')
-          .select(`symbol, company_name, ${config.valueColumn}, ${config.extremeColumn || 'exchange'}`)
+          .select(selectColumns.join(', '))
           .not(config.valueColumn, 'is', null);
 
         // Apply exchange filter
@@ -47,7 +58,8 @@ export async function GET(request: NextRequest) {
           ticker: item.symbol,
           company_name: item.company_name,
           value: item[config.valueColumn] || 0,
-          extreme: item[config.extremeColumn || 'exchange'],
+          extreme: config.extremeColumn ? item[config.extremeColumn] : item.exchange,
+          exchange: item.exchange,
           sparkline: [], // Will be populated with historical data in future enhancement
         }));
 

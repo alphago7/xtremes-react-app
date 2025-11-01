@@ -17,7 +17,7 @@ interface ExtremeCardProps {
   indicator: string;
   description: string;
   symbols: ExtremSymbol[];
-  onSymbolClick: (symbol: string) => void;
+  onSymbolClick: (symbol: string, exchange?: string) => void;
   category?: string;
   latestValue?: number;
   formatValue?: (value: number) => string;
@@ -145,7 +145,7 @@ export function ExtremeCard({
             <div
               key={symbol.ticker}
               className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-surface/50 cursor-pointer transition-all duration-150 group"
-              onClick={() => onSymbolClick(symbol.ticker)}
+              onClick={() => onSymbolClick(symbol.ticker, symbol.exchange)}
             >
               <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <span className="text-xs text-muted-foreground w-4 shrink-0">

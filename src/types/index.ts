@@ -132,6 +132,7 @@ export interface ExtremSymbol {
   company_name: string;
   value: number;
   extreme: string | null;
+  exchange?: string;
   change_pct?: number;
   sparkline?: number[];
 }

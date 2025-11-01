@@ -56,7 +56,14 @@ export default function DashboardPage() {
 
   const handleSymbolClick = (symbol: string, exchange?: string) => {
     setSelectedSymbol(symbol);
-    setChartSymbolExchange(exchange || selectedExchange === 'ALL' ? 'NSE' : selectedExchange);
+    const resolvedExchange =
+      exchange && exchange !== 'ALL'
+        ? exchange
+        : selectedExchange === 'ALL'
+          ? 'NSE'
+          : selectedExchange;
+
+    setChartSymbolExchange(resolvedExchange);
     setChartDrawerOpen(true);
   };
 
