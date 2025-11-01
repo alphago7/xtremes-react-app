@@ -29,20 +29,45 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
   const [ohlcData, setOhlcData] = useState<any[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [chartContainerReady, setChartContainerReady] = useState(false);
 
-  // Initialize chart once when component mounts
+  // Callback ref to know when div is mounted
+  const setChartDivRef = (node: HTMLDivElement | null) => {
+    chartDivRef.current = node;
+    if (node && !chartContainerReady) {
+      console.log('📍 Chart div mounted');
+      setChartContainerReady(true);
+    }
+  };
+
+  // Initialize chart once container is ready
   useEffect(() => {
+    if (!chartContainerReady || !chartDivRef.current || chartInstanceRef.current) {
+      console.log('⏸️ Waiting...', { chartContainerReady, hasDiv: !!chartDivRef.current, hasChart: !!chartInstanceRef.current });
+      return;
+    }
+
+    console.log('🚀 Starting chart initialization...');
+
     let chart: any = null;
     let series: any = null;
 
     const init = async () => {
-      if (!chartDivRef.current) return;
+      const div = chartDivRef.current;
+      if (!div) {
+        console.error('❌ Div disappeared');
+        return;
+      }
 
       try {
+        console.log('📦 Loading lightweight-charts...');
         const { createChart } = await import('lightweight-charts');
+        console.log('✅ Library loaded');
 
-        chart = createChart(chartDivRef.current, {
-          width: chartDivRef.current.clientWidth || 800,
+        console.log('🎨 Creating chart...');
+
+        chart = createChart(div, {
+          width: div.clientWidth || 800,
           height: 500,
           layout: {
             background: { color: '#0a0a0a' },
@@ -70,36 +95,31 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
         });
 
         chartInstanceRef.current = { chart, series };
-        console.log('✅ Chart initialized');
+        console.log('✅✅✅ Chart initialized successfully!');
 
         // Resize handler
         const resizeObserver = new ResizeObserver(() => {
-          if (chart && chartDivRef.current) {
-            chart.applyOptions({ width: chartDivRef.current.clientWidth });
+          if (chart && div) {
+            chart.applyOptions({ width: div.clientWidth });
           }
         });
 
-        if (chartDivRef.current) {
-          resizeObserver.observe(chartDivRef.current);
-        }
-
-        return () => {
-          resizeObserver.disconnect();
-        };
+        resizeObserver.observe(div);
       } catch (err) {
-        console.error('Chart init error:', err);
+        console.error('❌ Chart init error:', err);
       }
     };
 
     init();
 
     return () => {
-      if (chart) {
-        chart.remove();
+      console.log('🧹 Cleaning up chart...');
+      if (chartInstanceRef.current?.chart) {
+        chartInstanceRef.current.chart.remove();
         chartInstanceRef.current = null;
       }
     };
-  }, []); // Only run once on mount
+  }, [chartContainerReady]); // Run when container becomes ready
 
   // Fetch data when symbol/timeframe changes
   useEffect(() => {
@@ -205,7 +225,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
             )}
 
             {/* Always render chart div */}
-            <div ref={chartDivRef} style={{ width: '100%', height: '500px' }} />
+            <div ref={setChartDivRef} style={{ width: '100%', height: '500px' }} />
 
             {/* Debug */}
             <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
