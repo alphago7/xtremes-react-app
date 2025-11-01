@@ -1,12 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData } from 'lightweight-charts';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X, TrendingUp, Minus, GitFork, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// Dynamic import types
+type IChartApi = any;
+type ISeriesApi = any;
+type CandlestickData = {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
 
 interface ChartPanelProps {
   symbol: string;
@@ -33,13 +43,17 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
   const [chartReady, setChartReady] = useState(false);
 
   // Callback ref to initialize chart when container is ready
-  const chartContainerRef = (node: HTMLDivElement | null) => {
+  const chartContainerRef = async (node: HTMLDivElement | null) => {
     if (!node || !isOpen || chartRef.current) return;
 
     console.log('Chart container mounted, initializing...');
     console.log('Container dimensions:', node.clientWidth, 'x', node.clientHeight);
 
     try {
+      // Dynamically import lightweight-charts
+      const { createChart } = await import('lightweight-charts');
+      console.log('lightweight-charts loaded');
+
       const chart = createChart(node, {
         layout: {
           background: { color: '#0a0a0a' },
