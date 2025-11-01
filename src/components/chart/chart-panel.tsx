@@ -47,15 +47,19 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
 
   // Initialize chart when panel opens AND container is mounted
   useEffect(() => {
+    console.log(`[EFFECT] Chart init effect triggered - isOpen: ${isOpen}, containerMounted: ${containerMounted}, hasContainer: ${!!chartContainerRef.current}`);
+
     if (!isOpen) {
       console.log('[INIT] Panel not open');
       return;
     }
 
     if (!containerMounted || !chartContainerRef.current) {
-      console.log('[INIT] Container not mounted yet');
+      console.log('[INIT] Container not ready - containerMounted:', containerMounted, 'ref:', !!chartContainerRef.current);
       return;
     }
+
+    console.log('[INIT] All conditions met, starting initialization...');
 
     let chart: any = null;
     let candlestickSeries: any = null;
@@ -63,14 +67,19 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
     const initChart = async () => {
       try {
         const container = chartContainerRef.current;
-        if (!container) return;
+        if (!container) {
+          console.error('[INIT] Container ref became null!');
+          return;
+        }
 
-        console.log('[INIT] Starting chart initialization...');
+        console.log('[INIT] Container dimensions:', container.clientWidth, 'x', container.clientHeight);
+        console.log('[INIT] Loading lightweight-charts...');
 
         // Dynamically import
         const { createChart } = await import('lightweight-charts');
+        console.log('[INIT] lightweight-charts loaded ✅');
 
-        console.log('[INIT] Creating chart...');
+        console.log('[INIT] Creating chart instance...');
         chart = createChart(container, {
           layout: {
             background: { color: '#0a0a0a' },
