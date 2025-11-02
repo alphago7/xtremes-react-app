@@ -66,8 +66,11 @@ export async function GET(request: NextRequest) {
         return typeof raw === 'number';
       })
       .map((column) => {
-        const config = configByColumn.get(column);
         const rawValue = data[column as keyof typeof data];
+        const normalizedColumn = `${column}_normalized`;
+        const normalizedValue = data[normalizedColumn as keyof typeof data];
+        const valueColumn = typeof normalizedValue === 'number' ? normalizedColumn : column;
+        const config = configByColumn.get(valueColumn) ?? configByColumn.get(column);
         const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? null);
         const rankColumn = deriveRankColumn(column);
         const rankValue = data[rankColumn as keyof typeof data];
@@ -75,14 +78,14 @@ export async function GET(request: NextRequest) {
           ? data[config.extremeColumn as keyof typeof data] ?? null
           : data[`${column}_extreme` as keyof typeof data] ?? null;
 
-        const title = config?.title ?? column
+        const title = config?.title ?? valueColumn
           .split('_')
           .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
           .join(' ');
 
         return {
           key: config?.key ?? column,
-          column,
+          column: valueColumn,
           title,
           name: config?.name ?? title,
           category: config?.category ?? 'additional',
