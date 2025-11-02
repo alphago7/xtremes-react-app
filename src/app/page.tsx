@@ -6,6 +6,7 @@ import { ExtremeCard } from '@/components/dashboard/extreme-card';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { SimpleChartPanel } from '@/components/chart/simple-chart-panel';
 import { ExtremSymbol } from '@/types';
+import type { WatchlistItemInput } from '@/store/watchlist-store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const [extremeData, setExtremeData] = useState<Record<string, ExtremSymbol[]>>({});
   const [meta, setMeta] = useState<ExtremeDataMeta | null>(null);
   const [chartSymbolExchange, setChartSymbolExchange] = useState<string>('NSE');
+  const [chartWatchlistMeta, setChartWatchlistMeta] = useState<Partial<WatchlistItemInput> | null>(null);
 
   const loadExtremeData = useCallback(async () => {
     setLoading(true);
@@ -65,23 +67,52 @@ export default function DashboardPage() {
     loadExtremeData();
   }, [loadExtremeData]);
 
-  const handleSymbolClick = (symbol: string, exchange?: string) => {
+  const handleSymbolClick = (
+    symbol: string,
+    options?: string | {
+      exchange?: string;
+      meta?: {
+        indicatorKey?: string;
+        indicatorTitle?: string;
+        indicatorName?: string;
+        indicatorValue?: number;
+        indicatorRank?: number;
+        companyName?: string;
+        capturedAt?: string;
+      };
+    }
+  ) => {
+    const opts = typeof options === 'string' ? { exchange: options } : options || {};
     setSelectedSymbol(symbol);
     const resolvedExchange =
-      exchange && exchange !== 'ALL'
-        ? exchange
+      opts.exchange && opts.exchange !== 'ALL'
+        ? opts.exchange
         : selectedExchange === 'ALL'
           ? 'NSE'
           : selectedExchange;
 
     setChartSymbolExchange(resolvedExchange);
+    setChartWatchlistMeta({
+      symbol,
+      exchange: resolvedExchange,
+      companyName: opts.meta?.companyName,
+      indicatorKey: opts.meta?.indicatorKey,
+      indicatorTitle: opts.meta?.indicatorTitle,
+      indicatorName: opts.meta?.indicatorName,
+      indicatorValue: opts.meta?.indicatorValue,
+      indicatorRank: opts.meta?.indicatorRank,
+      capturedAt: opts.meta?.capturedAt ?? new Date().toISOString(),
+    });
     setChartDrawerOpen(true);
   };
 
   const handleCloseChart = () => {
     setChartDrawerOpen(false);
     // Keep symbol selected for a moment before clearing
-    setTimeout(() => setSelectedSymbol(null), 300);
+    setTimeout(() => {
+      setSelectedSymbol(null);
+      setChartWatchlistMeta(null);
+    }, 300);
   };
 
   // Filter configs based on selected category
@@ -210,6 +241,7 @@ export default function DashboardPage() {
         exchange={chartSymbolExchange}
         isOpen={chartDrawerOpen}
         onClose={handleCloseChart}
+        watchlistMeta={chartWatchlistMeta}
       />
     </div>
   );

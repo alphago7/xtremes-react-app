@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { BookmarkPlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   CandlestickData,
@@ -12,12 +12,23 @@ import type {
   IChartApi,
   ISeriesApi,
 } from 'lightweight-charts';
+import { useWatchlistStore } from '@/store/watchlist-store';
+import { formatDistanceToNow } from 'date-fns';
 
 interface SimpleChartPanelProps {
   symbol: string;
   exchange?: string;
   isOpen: boolean;
   onClose: () => void;
+  watchlistMeta?: {
+    indicatorKey?: string;
+    indicatorTitle?: string;
+    indicatorName?: string;
+    indicatorValue?: number;
+    indicatorRank?: number;
+    companyName?: string;
+    capturedAt?: string;
+  } | null;
 }
 
 const TIMEFRAMES = [
@@ -48,7 +59,7 @@ interface SymbolInfoResponse {
   };
 }
 
-export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: SimpleChartPanelProps) {
+export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, watchlistMeta }: SimpleChartPanelProps) {
   const chartDivRef = useRef<HTMLDivElement | null>(null);
   const chartInstanceRef = useRef<ChartInstance | null>(null);
   const latestDataRef = useRef<CandlestickWithVolume[]>([]);
@@ -58,6 +69,39 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
   const [loading, setLoading] = useState(false);
   const [chartContainerReady, setChartContainerReady] = useState(false);
   const hasRegisteredContainerRef = useRef(false);
+
+  const addToWatchlist = useWatchlistStore((state) => state.addItem);
+  const removeFromWatchlist = useWatchlistStore((state) => state.removeItem);
+  const resolvedExchange = exchange || 'NSE';
+  const isInWatchlist = useWatchlistStore((state) =>
+    state.isInWatchlist(symbol, resolvedExchange)
+  );
+
+  useEffect(() => {
+    if (watchlistMeta?.companyName) {
+      setCompanyName(watchlistMeta.companyName);
+    }
+  }, [watchlistMeta?.companyName]);
+
+  const handleToggleWatchlist = () => {
+    if (!symbol) return;
+
+    if (isInWatchlist) {
+      removeFromWatchlist(symbol, resolvedExchange);
+    } else {
+      addToWatchlist({
+        symbol,
+        exchange: resolvedExchange,
+        companyName: companyName || watchlistMeta?.companyName,
+        indicatorKey: watchlistMeta?.indicatorKey,
+        indicatorTitle: watchlistMeta?.indicatorTitle,
+        indicatorName: watchlistMeta?.indicatorName,
+        indicatorValue: watchlistMeta?.indicatorValue,
+        indicatorRank: watchlistMeta?.indicatorRank,
+        capturedAt: watchlistMeta?.capturedAt,
+      });
+    }
+  };
 
   const applyDataToChart = (data: CandlestickWithVolume[]) => {
     const instance = chartInstanceRef.current;
@@ -346,25 +390,62 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: 
       <SheetContent side="right" className="w-full sm:max-w-4xl lg:max-w-6xl p-0">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <SheetHeader className="px-6 py-4 border-b shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <SheetTitle className="text-2xl font-bold">{symbol}</SheetTitle>
-                <Badge variant="outline">{exchange}</Badge>
-                {price > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold">${price.toFixed(2)}</span>
-                    <span className={cn('text-sm', change >= 0 ? 'text-green-500' : 'text-red-500')}>
-                      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-                    </span>
+          <SheetHeader className="px-6 py-4 border-b shrink-0 space-y-2">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  <SheetTitle className="text-2xl font-bold">{symbol}</SheetTitle>
+                  <Badge variant="outline">{resolvedExchange}</Badge>
+                  {price > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold">${price.toFixed(2)}</span>
+                      <span className={cn('text-sm', change >= 0 ? 'text-green-500' : 'text-red-500')}>
+                        {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {(companyName || watchlistMeta?.indicatorTitle) && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {companyName && <span>{companyName}</span>}
+                    {watchlistMeta?.indicatorTitle && (
+                      <>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="font-medium text-foreground">{watchlistMeta.indicatorTitle}</span>
+                        {typeof watchlistMeta.indicatorValue === 'number' && (
+                          <span>Value {watchlistMeta.indicatorValue.toFixed(2)}</span>
+                        )}
+                        {typeof watchlistMeta.indicatorRank === 'number' && (
+                          <span>Rank #{watchlistMeta.indicatorRank}</span>
+                        )}
+                        {watchlistMeta.capturedAt && (
+                          <span>
+                            Snapshot{' '}
+                            {formatDistanceToNow(new Date(watchlistMeta.capturedAt), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={isInWatchlist ? 'secondary' : 'default'}
+                  size="sm"
+                  onClick={handleToggleWatchlist}
+                  className="h-8"
+                >
+                  <BookmarkPlus className="h-4 w-4 mr-2" />
+                  {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+                </Button>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            {companyName && <p className="text-sm text-muted-foreground">{companyName}</p>}
           </SheetHeader>
 
           {/* Timeframe Buttons */}

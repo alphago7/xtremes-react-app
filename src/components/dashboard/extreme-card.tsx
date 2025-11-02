@@ -12,15 +12,29 @@ import { TrendingUp, TrendingDown, Info } from 'lucide-react';
 import { ExtremSymbol } from '@/types';
 import { cn } from '@/lib/utils';
 
+interface SymbolClickMeta {
+  exchange?: string;
+  meta?: {
+    indicatorKey?: string;
+    indicatorTitle?: string;
+    indicatorName?: string;
+    indicatorValue?: number;
+    indicatorRank?: number;
+    companyName?: string;
+    capturedAt?: string;
+  };
+}
+
 interface ExtremeCardProps {
   title: string;
   indicator: string;
   description: string;
   symbols: ExtremSymbol[];
-  onSymbolClick: (symbol: string, exchange?: string) => void;
+  onSymbolClick: (symbol: string, options?: string | SymbolClickMeta) => void;
   category?: string;
   latestValue?: number;
   formatValue?: (value: number) => string;
+  indicatorKey?: string;
 }
 
 // Simple sparkline component
@@ -69,6 +83,7 @@ export function ExtremeCard({
   category,
   latestValue,
   formatValue,
+  indicatorKey,
 }: ExtremeCardProps) {
   const getExtremeColor = (extreme: string | null) => {
     if (!extreme) return 'text-neutral';
@@ -145,7 +160,20 @@ export function ExtremeCard({
             <div
               key={symbol.ticker}
               className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-surface/50 cursor-pointer transition-all duration-150 group"
-              onClick={() => onSymbolClick(symbol.ticker, symbol.exchange)}
+              onClick={() =>
+                onSymbolClick(symbol.ticker, {
+                  exchange: symbol.exchange,
+                  meta: {
+                    indicatorKey,
+                    indicatorTitle: title,
+                    indicatorName: indicator,
+                    indicatorValue: symbol.value,
+                    indicatorRank: index + 1,
+                    companyName: symbol.company_name,
+                    capturedAt: symbol.captured_at,
+                  },
+                })
+              }
             >
               <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <span className="text-xs text-muted-foreground w-4 shrink-0">
