@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Transform data to match ExtremSymbol interface
-        const transformedData: ExtremSymbol[] = (data || []).map((item) => {
+        const transformedData: ExtremSymbol[] = (data || []).map((item, index) => {
           const exchangeValue =
             tableName === 'stock_indicators_us'
               ? 'US'
@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
               ? (item[config.extremeColumn] as string | null)
               : exchangeValue ?? null,
             exchange: exchangeValue,
+            captured_at: new Date().toISOString(),
+            rank: index + 1,
             sparkline: [],
           };
         });
