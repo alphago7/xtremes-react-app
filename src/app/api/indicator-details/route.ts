@@ -91,24 +91,26 @@ export async function GET(request: NextRequest) {
       .filter((key) => {
         if (seenValueColumns.has(key)) return false;
         if (['symbol', 'company_name', 'exchange', 'updated_at', 'created_at', 'as_of'].includes(key)) return false;
-        if (key.endsWith('_rank') || key.endsWith('_extreme')) return false;
-        return typeof data[key as keyof typeof data] === 'number';
+        if (key.endsWith('_rank') || key.endsWith('_extreme') || key.endsWith('_value')) return false;
+        const value = data[key as keyof typeof data];
+        return typeof value === 'number';
       })
       .map((key) => {
         const value = data[key as keyof typeof data];
+        const extremeValue = data[`${key}_extreme` as keyof typeof data] ?? null;
         const rankColumn = deriveRankColumn(key);
         const rankValue = data[rankColumn as keyof typeof data];
         const title = key
           .replace(/_/g, ' ')
-          .replace(/\w/g, (char) => char.toUpperCase());
+          .replace(/\b\w/g, (char) => char.toUpperCase());
 
         return {
           key,
           title,
           name: key,
           category: 'additional',
-          value: typeof value === 'number' ? value : value === null ? null : Number(value ?? null),
-          extreme: null,
+          value: typeof value === 'number' ? value : null,
+          extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
           rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
         } satisfies IndicatorDetailItem;
       });
