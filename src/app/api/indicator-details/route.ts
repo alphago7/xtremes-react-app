@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
 import type { IndicatorDetailResponse, IndicatorDetailItem } from '@/types';
-import { ADDITIONAL_INDICATOR_DEFINITIONS } from '@/lib/indicator-columns';
 
 type ExchangeFilter = 'NSE' | 'US';
 
@@ -27,6 +26,49 @@ const deriveRankColumn = (valueColumn: string): string | null => {
   }
 
   return `${valueColumn}_rank`;
+};
+
+const getFriendlyTitle = (column: string): string =>
+  column
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const inferCategory = (column: string): IndicatorDetailItem['category'] => {
+  const lower = column.toLowerCase();
+  if (lower.includes('ema') || lower.includes('sma') || lower.includes('slope') || lower.includes('trend') || lower.includes('ma')) {
+    return 'trend';
+  }
+  if (lower.includes('vol') || lower.includes('volume') || lower.includes('obv') || lower.includes('vwap')) {
+    return 'volume';
+  }
+  if (lower.includes('atr') || lower.includes('beta') || lower.includes('std') || lower.includes('deviation')) {
+    return 'volatility';
+  }
+  if (lower.includes('rsi') || lower.includes('macd') || lower.includes('cmf') || lower.includes('stoch')) {
+    return 'momentum';
+  }
+  return 'additional';
+};
+
+const getFormatter = (column: string): ((value: number) => string) | undefined => {
+  const lower = column.toLowerCase();
+  if (lower.includes('rank')) {
+    return (value: number) => `#${Math.round(value)}`;
+  }
+  if (lower.includes('volume') || lower.includes('obv')) {
+    return (value: number) => value.toFixed(0);
+  }
+  if (lower.includes('ratio') || lower.includes('beta')) {
+    return (value: number) => value.toFixed(2);
+  }
+  if (lower.includes('z') || lower.includes('normalized') || lower.includes('deviation')) {
+    return (value: number) => value.toFixed(3);
+  }
+  if (lower.includes('ema') || lower.includes('sma') || lower.includes('slope') || lower.includes('atr') || lower.includes('vwap')) {
+    return (value: number) => value.toFixed(2);
+  }
+  return undefined;
 };
 
 export async function GET(request: NextRequest) {
@@ -88,44 +130,43 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const additionalIndicators: IndicatorDetailItem[] = [];
+    const additionalIndicators: IndicatorDetailItem[] = Object.keys(data)
+      .filter((column) => {
+        if (seenValueColumns.has(column)) return false;
+        if (['symbol', 'company_name', 'exchange', 'updated_at', 'created_at', 'as_of'].includes(column)) return false;
+        if (column.endsWith('_rank') || column.endsWith('_extreme') || column.endsWith('_value')) return false;
+        const raw = data[column as keyof typeof data];
+        return typeof raw === 'number';
+      })
+      .map((column) => {
+        const rawValue = data[column as keyof typeof data];
+        const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? null);
+        const extremeValue = data[`${column}_extreme` as keyof typeof data] ?? null;
+        const rankColumn = deriveRankColumn(column);
+        const rankValue = data[rankColumn as keyof typeof data];
 
-    ADDITIONAL_INDICATOR_DEFINITIONS.forEach((def) => {
-      if (seenValueColumns.has(def.column)) {
-        return;
-      }
+        const category = inferCategory(column);
+        const title = getFriendlyTitle(column);
 
-      const rawValue = data[def.column as keyof typeof data];
+        seenValueColumns.add(column);
+        if (rankColumn) {
+          seenValueColumns.add(rankColumn);
+        }
+        if (typeof extremeValue !== 'undefined') {
+          seenValueColumns.add(`${column}_extreme`);
+        }
 
-      if (rawValue === undefined) {
-        return;
-      }
-
-      const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? null);
-      const extremeKey = `${def.column}_extreme` as keyof typeof data;
-      const rankColumn = deriveRankColumn(def.column);
-      const extremeValue = data[extremeKey] ?? null;
-      const rankValue = data[rankColumn as keyof typeof data];
-
-      seenValueColumns.add(def.column);
-      if (rankColumn) {
-        seenValueColumns.add(rankColumn);
-      }
-      if (typeof extremeValue !== 'undefined') {
-        seenValueColumns.add(`${def.column}_extreme`);
-      }
-
-      additionalIndicators.push({
-        key: def.column,
-        title: def.title,
-        name: def.name ?? def.title,
-        category: def.category,
-        value: Number.isFinite(value) ? value : null,
-        extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
-        rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
-        format: def.format,
+        return {
+          key: column,
+          title,
+          name: title,
+          category,
+          value: Number.isFinite(value) ? value : null,
+          extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
+          rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
+          format: getFormatter(column),
+        } satisfies IndicatorDetailItem;
       });
-    });
 
     const combined = [...indicators, ...additionalIndicators].sort((a, b) => {
       const categoryOrder = ['momentum', 'trend', 'volume', 'volatility', 'additional'];
