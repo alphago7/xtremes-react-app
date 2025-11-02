@@ -35,7 +35,7 @@ export default function DashboardPage() {
   } = useAppStore();
   const [extremeData, setExtremeData] = useState<Record<string, ExtremSymbol[]>>({});
   const [meta, setMeta] = useState<ExtremeDataMeta | null>(null);
-  const [chartSymbolExchange, setChartSymbolExchange] = useState<string>('NSE');
+  const [chartSymbolExchange, setChartSymbolExchange] = useState<string>('US');
   const [chartWatchlistMeta, setChartWatchlistMeta] = useState<Partial<WatchlistItemInput> | null>(null);
 
   const loadExtremeData = useCallback(async () => {

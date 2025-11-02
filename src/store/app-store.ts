@@ -51,7 +51,7 @@ export const useAppStore = create<AppStore>((set) => ({
   tableFilters: initialFilters,
   selectedSymbol: null,
   chartDrawerOpen: false,
-  selectedExchange: 'ALL',
+  selectedExchange: 'US',
   selectedCategory: 'all',
 
   // Data State
@@ -86,7 +86,7 @@ export const useAppStore = create<AppStore>((set) => ({
   // Utility Actions
   resetFilters: () => set({
     tableFilters: initialFilters,
-    selectedExchange: 'ALL',
+    selectedExchange: 'US',
     selectedCategory: 'all',
     selectedTimeframe: '1D',
   }),

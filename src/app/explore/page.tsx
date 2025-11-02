@@ -50,13 +50,13 @@ const initialState: FetchState = {
 export default function ExploreIndicatorsPage() {
   const [selectedCategory, setSelectedCategory] = useState<'all' | IndicatorConfig['category']>('all');
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string>(INDICATOR_CONFIGS[0]?.key ?? '');
-  const [selectedExchange, setSelectedExchange] = useState<'NSE' | 'US'>('NSE');
+  const [selectedExchange, setSelectedExchange] = useState<'NSE' | 'US'>('US');
 
   const [topState, setTopState] = useState<FetchState>(initialState);
   const [bottomState, setBottomState] = useState<FetchState>(initialState);
 
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [chartExchange, setChartExchange] = useState<'NSE' | 'US'>('NSE');
+  const [chartExchange, setChartExchange] = useState<'NSE' | 'US'>('US');
   const [chartWatchlistMeta, setChartWatchlistMeta] = useState<Partial<WatchlistItemInput> | null>(null);
   const [chartOpen, setChartOpen] = useState(false);
 
@@ -84,11 +84,13 @@ export default function ExploreIndicatorsPage() {
   }, [filteredIndicators, selectedIndicatorKey]);
 
   useEffect(() => {
+    if (!indicatorConfig) {
+      return;
+    }
+
     let isCancelled = false;
 
     const resetAndLoad = async () => {
-      if (!indicatorConfig) return;
-
       setTopState({ ...initialState, loading: true });
       setBottomState({ ...initialState, loading: true });
 
