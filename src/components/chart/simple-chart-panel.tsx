@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -566,16 +566,6 @@ interface IndicatorDetailsGridProps {
 }
 
 function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
-  const grouped = useMemo(() => {
-    const map = new Map<string, IndicatorDetailItem[]>();
-    details.forEach((item) => {
-      const arr = map.get(item.category) ?? [];
-      arr.push(item);
-      map.set(item.category, arr);
-    });
-    return Array.from(map.entries());
-  }, [details]);
-
   const formatValue = useCallback((item: IndicatorDetailItem) => {
     if (item.value === null || item.value === undefined) {
       return '—';
@@ -595,50 +585,25 @@ function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
   }, []);
 
   return (
-    <div className="space-y-5">
-      {grouped.map(([category, items]) => (
-        <div key={category} className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            {category}
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {items.map((item) => (
-              <div
-                key={item.key}
-                className="rounded-lg border border-border bg-card/80 px-4 py-3 shadow-sm hover:border-accent/40 transition"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">{item.title}</div>
-                    <div className="text-xs text-muted-foreground">{item.name}</div>
-                  </div>
-                  {typeof item.rank === 'number' && (
-                    <Badge variant="outline" className="text-[10px] uppercase">
-                      Rank #{item.rank}
-                    </Badge>
-                  )}
-                </div>
-                <div className="mt-3 flex items-end justify-between">
-                  <div>
-                    <div className="text-2xl font-semibold text-foreground leading-none">
-                      {formatValue(item)}
-                    </div>
-                    {item.extreme && (
-                      <p className="mt-1 text-[11px] font-medium uppercase text-muted-foreground">
-                        {item.extreme.replace(/_/g, ' ')}
-                      </p>
-                    )}
-                  </div>
-                  {item.thresholds && (
-                    <div className="text-right text-[10px] text-muted-foreground space-y-0.5">
-                      {Object.entries(item.thresholds).map(([label, value]) => (
-                        <div key={label}>{label}: {value}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+    <div className="grid gap-3 sm:grid-cols-2">
+      {details.map((item) => (
+        <div
+          key={item.key}
+          className="flex items-center justify-between rounded-lg border border-border bg-card/80 px-4 py-3 shadow-sm hover:border-accent/40 transition"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-foreground truncate">{item.title}</div>
+            {item.extreme && (
+              <div className="text-[11px] uppercase text-muted-foreground">{item.extreme.replace(/_/g, ' ')}</div>
+            )}
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-semibold text-foreground leading-none">
+              {formatValue(item)}
+            </div>
+            {typeof item.rank === 'number' && (
+              <div className="text-[11px] text-muted-foreground">Rank #{item.rank}</div>
+            )}
           </div>
         </div>
       ))}

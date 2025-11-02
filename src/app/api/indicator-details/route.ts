@@ -28,49 +28,6 @@ const deriveRankColumn = (valueColumn: string): string | null => {
   return `${valueColumn}_rank`;
 };
 
-const getFriendlyTitle = (column: string): string =>
-  column
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-
-const inferCategory = (column: string): IndicatorDetailItem['category'] => {
-  const lower = column.toLowerCase();
-  if (lower.includes('ema') || lower.includes('sma') || lower.includes('slope') || lower.includes('trend') || lower.includes('ma')) {
-    return 'trend';
-  }
-  if (lower.includes('vol') || lower.includes('volume') || lower.includes('obv') || lower.includes('vwap')) {
-    return 'volume';
-  }
-  if (lower.includes('atr') || lower.includes('beta') || lower.includes('std') || lower.includes('deviation')) {
-    return 'volatility';
-  }
-  if (lower.includes('rsi') || lower.includes('macd') || lower.includes('cmf') || lower.includes('stoch')) {
-    return 'momentum';
-  }
-  return 'additional';
-};
-
-const getFormatter = (column: string): ((value: number) => string) | undefined => {
-  const lower = column.toLowerCase();
-  if (lower.includes('rank')) {
-    return (value: number) => `#${Math.round(value)}`;
-  }
-  if (lower.includes('volume') || lower.includes('obv')) {
-    return (value: number) => value.toFixed(0);
-  }
-  if (lower.includes('ratio') || lower.includes('beta')) {
-    return (value: number) => value.toFixed(2);
-  }
-  if (lower.includes('z') || lower.includes('normalized') || lower.includes('deviation')) {
-    return (value: number) => value.toFixed(3);
-  }
-  if (lower.includes('ema') || lower.includes('sma') || lower.includes('slope') || lower.includes('atr') || lower.includes('vwap')) {
-    return (value: number) => value.toFixed(2);
-  }
-  return undefined;
-};
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
