@@ -76,7 +76,6 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetailItem[]>([]);
-  const detailsLoadedKeyRef = useRef<string>('');
 
   const addToWatchlist = useWatchlistStore((state) => state.addItem);
   const removeFromWatchlist = useWatchlistStore((state) => state.removeItem);
@@ -93,10 +92,6 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
 
   const fetchIndicatorDetails = useCallback(async () => {
     if (!symbol) return;
-    const loadKey = `${symbol}|${resolvedExchange}`;
-    if (detailsLoadedKeyRef.current === loadKey && indicatorDetails.length > 0) {
-      return;
-    }
 
     setDetailsLoading(true);
     setDetailsError(null);
@@ -110,16 +105,14 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
       }
 
       setIndicatorDetails(json.data.indicators);
-      detailsLoadedKeyRef.current = loadKey;
     } catch (error) {
       console.error('Indicator details fetch error:', error);
       setIndicatorDetails([]);
       setDetailsError(error instanceof Error ? error.message : 'Failed to load technical details');
-      detailsLoadedKeyRef.current = '';
     } finally {
       setDetailsLoading(false);
     }
-  }, [symbol, resolvedExchange, indicatorDetails.length]);
+  }, [symbol, resolvedExchange]);
 
   const handleToggleWatchlist = () => {
     if (!symbol) return;
@@ -424,9 +417,9 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
 
   useEffect(() => {
     setIndicatorDetails([]);
-    detailsLoadedKeyRef.current = '';
     setActiveTab('chart');
     setDetailsError(null);
+    setDetailsLoading(false);
   }, [symbol, resolvedExchange]);
 
   return (
