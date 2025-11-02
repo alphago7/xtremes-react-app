@@ -143,12 +143,12 @@ export interface IndicatorDetailItem {
   key: string;
   title: string;
   name: string;
-  category: IndicatorConfig['category'];
+  category: IndicatorConfig['category'] | 'additional';
   value: number | null;
   extreme: string | null;
   rank: number | null;
-  direction: IndicatorConfig['direction'];
-  thresholds: IndicatorConfig['thresholds'] | null;
+  direction?: IndicatorConfig['direction'];
+  thresholds?: IndicatorConfig['thresholds'] | null;
 }
 
 export interface IndicatorDetailResponse {

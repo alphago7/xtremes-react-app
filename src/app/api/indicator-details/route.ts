@@ -56,8 +56,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Symbol not found' }, { status: 404 });
     }
 
+    const seenValueColumns = new Set<string>();
+
     const indicators: IndicatorDetailItem[] = INDICATOR_CONFIGS.map((config) => {
       const rankColumn = deriveRankColumn(config.valueColumn);
+      seenValueColumns.add(config.valueColumn);
+      if (config.extremeColumn) {
+        seenValueColumns.add(config.extremeColumn);
+      }
+      if (rankColumn) {
+        seenValueColumns.add(rankColumn);
+      }
 
       const value = data[config.valueColumn as keyof typeof data];
       const extremeValue = config.extremeColumn
@@ -78,12 +87,43 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const additionalIndicators: IndicatorDetailItem[] = Object.keys(data)
+      .filter((key) => {
+        if (seenValueColumns.has(key)) return false;
+        if (['symbol', 'company_name', 'exchange', 'updated_at', 'created_at', 'as_of'].includes(key)) return false;
+        if (key.endsWith('_rank') || key.endsWith('_extreme')) return false;
+        return typeof data[key as keyof typeof data] === 'number';
+      })
+      .map((key) => {
+        const value = data[key as keyof typeof data];
+        const rankColumn = deriveRankColumn(key);
+        const rankValue = data[rankColumn as keyof typeof data];
+        const title = key
+          .replace(/_/g, ' ')
+          .replace(/\w/g, (char) => char.toUpperCase());
+
+        return {
+          key,
+          title,
+          name: key,
+          category: 'additional',
+          value: typeof value === 'number' ? value : value === null ? null : Number(value ?? null),
+          extreme: null,
+          rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
+        } satisfies IndicatorDetailItem;
+      });
+
+    const combined = [...indicators, ...additionalIndicators].sort((a, b) => {
+      const categoryOrder = ['momentum', 'trend', 'volume', 'volatility', 'additional'];
+      return categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+    });
+
     const response: IndicatorDetailResponse = {
       symbol: data.symbol,
       exchange,
       companyName: data.company_name,
       updatedAt: data.updated_at || data.as_of || null,
-      indicators,
+      indicators: combined,
     };
 
     return NextResponse.json({ success: true, data: response });
