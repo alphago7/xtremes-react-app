@@ -133,8 +133,30 @@ export interface ExtremSymbol {
   value: number;
   extreme: string | null;
   exchange?: string;
+  captured_at?: string | null;
+  rank?: number | null;
   change_pct?: number;
   sparkline?: number[];
+}
+
+export interface IndicatorDetailItem {
+  key: string;
+  title: string;
+  name: string;
+  category: IndicatorConfig['category'];
+  value: number | null;
+  extreme: string | null;
+  rank: number | null;
+  direction: IndicatorConfig['direction'];
+  thresholds: IndicatorConfig['thresholds'] | null;
+}
+
+export interface IndicatorDetailResponse {
+  symbol: string;
+  exchange: 'NSE' | 'US';
+  companyName?: string;
+  updatedAt: string | null;
+  indicators: IndicatorDetailItem[];
 }
 
 // Table Row Type for main extremes table

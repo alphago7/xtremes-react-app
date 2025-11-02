@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookmarkPlus, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BookmarkPlus, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   CandlestickData,
@@ -14,6 +15,8 @@ import type {
 } from 'lightweight-charts';
 import { useWatchlistStore } from '@/store/watchlist-store';
 import { formatDistanceToNow } from 'date-fns';
+import { INDICATOR_CONFIGS } from '@/config/indicators';
+import type { IndicatorDetailItem, IndicatorDetailResponse } from '@/types';
 
 interface SimpleChartPanelProps {
   symbol: string;
@@ -69,6 +72,11 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
   const [loading, setLoading] = useState(false);
   const [chartContainerReady, setChartContainerReady] = useState(false);
   const hasRegisteredContainerRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<'chart' | 'technicals'>('chart');
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [indicatorDetails, setIndicatorDetails] = useState<IndicatorDetailItem[]>([]);
+  const detailsLoadedKeyRef = useRef<string>('');
 
   const addToWatchlist = useWatchlistStore((state) => state.addItem);
   const removeFromWatchlist = useWatchlistStore((state) => state.removeItem);
@@ -82,6 +90,36 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
       setCompanyName(watchlistMeta.companyName);
     }
   }, [watchlistMeta?.companyName]);
+
+  const fetchIndicatorDetails = useCallback(async () => {
+    if (!symbol) return;
+    const loadKey = `${symbol}|${resolvedExchange}`;
+    if (detailsLoadedKeyRef.current === loadKey && indicatorDetails.length > 0) {
+      return;
+    }
+
+    setDetailsLoading(true);
+    setDetailsError(null);
+    try {
+      const params = new URLSearchParams({ symbol, exchange: resolvedExchange });
+      const response = await fetch(`/api/indicator-details?${params.toString()}`);
+      const json: { success: boolean; data?: IndicatorDetailResponse; error?: string } = await response.json();
+
+      if (!json.success || !json.data) {
+        throw new Error(json.error || 'Failed to load technical details');
+      }
+
+      setIndicatorDetails(json.data.indicators);
+      detailsLoadedKeyRef.current = loadKey;
+    } catch (error) {
+      console.error('Indicator details fetch error:', error);
+      setIndicatorDetails([]);
+      setDetailsError(error instanceof Error ? error.message : 'Failed to load technical details');
+      detailsLoadedKeyRef.current = '';
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, [symbol, resolvedExchange, indicatorDetails.length]);
 
   const handleToggleWatchlist = () => {
     if (!symbol) return;
@@ -321,6 +359,12 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
     applyDataToChart(ohlcData);
   }, [ohlcData]);
 
+  useEffect(() => {
+    if (activeTab === 'technicals' && symbol) {
+      void fetchIndicatorDetails();
+    }
+  }, [activeTab, fetchIndicatorDetails, symbol]);
+
   // Fetch data when symbol/timeframe changes
   useEffect(() => {
     if (!isOpen || !symbol) return;
@@ -377,6 +421,13 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
   const change = ohlcData.length > 1
     ? ((ohlcData[ohlcData.length - 1].close - ohlcData[ohlcData.length - 2].close) / ohlcData[ohlcData.length - 2].close) * 100
     : 0;
+
+  useEffect(() => {
+    setIndicatorDetails([]);
+    detailsLoadedKeyRef.current = '';
+    setActiveTab('chart');
+    setDetailsError(null);
+  }, [symbol, resolvedExchange]);
 
   return (
     <Sheet
@@ -448,44 +499,149 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
             </div>
           </SheetHeader>
 
-          {/* Timeframe Buttons */}
-          <div className="px-6 py-3 border-b shrink-0 flex gap-2">
-            {TIMEFRAMES.map(tf => (
-              <Button
-                key={tf.value}
-                size="sm"
-                variant={timeframe === tf.value ? 'default' : 'outline'}
-                className={cn(
-                  'min-w-[64px] transition-colors',
-                  timeframe === tf.value
-                    ? 'bg-accent text-accent-foreground hover:bg-accent/90'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/20'
-                )}
-                onClick={() => setTimeframe(tf.value)}
-              >
-                {tf.value}
-              </Button>
-            ))}
-          </div>
-
-          {/* Chart */}
-          <div className="flex-1 relative bg-[#0a0a0a] p-4">
-            {loading && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                <div className="text-white">Loading...</div>
-              </div>
-            )}
-
-            {/* Always render chart div */}
-            <div ref={setChartDivRef} style={{ width: '100%', height: '500px' }} />
-
-            {/* Debug */}
-            <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-              {ohlcData.length} bars | {chartInstanceRef.current ? 'Chart OK' : 'No Chart'}
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as 'chart' | 'technicals')}
+            className="flex-1 flex flex-col"
+          >
+            <div className="px-6 border-b">
+              <TabsList className="h-9 mt-1">
+                <TabsTrigger value="chart">Chart</TabsTrigger>
+                <TabsTrigger value="technicals">Technical Snapshot</TabsTrigger>
+              </TabsList>
             </div>
-          </div>
+
+            <TabsContent value="chart" className="flex-1 focus:outline-none">
+              <div className="px-6 py-3 border-b shrink-0 flex flex-wrap gap-2">
+                {TIMEFRAMES.map((tf) => (
+                  <Button
+                    key={tf.value}
+                    size="sm"
+                    variant={timeframe === tf.value ? 'default' : 'outline'}
+                    className={cn(
+                      'min-w-[64px] transition-colors',
+                      timeframe === tf.value
+                        ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 dark:hover:bg-muted/20'
+                    )}
+                    onClick={() => setTimeframe(tf.value)}
+                  >
+                    {tf.value}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="relative flex-1 bg-[#0a0a0a] p-4">
+                {loading && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                    <div className="text-white">Loading...</div>
+                  </div>
+                )}
+
+                <div ref={setChartDivRef} style={{ width: '100%', height: '500px' }} />
+
+                <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+                  {ohlcData.length} bars | {chartInstanceRef.current ? 'Chart OK' : 'No Chart'}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="technicals" className="flex-1 px-6 py-4 overflow-y-auto focus:outline-none">
+              {detailsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading technical snapshot…
+                </div>
+              ) : detailsError ? (
+                <div className="rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {detailsError}
+                </div>
+              ) : indicatorDetails.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No technical data available for this symbol.</p>
+              ) : (
+                <IndicatorDetailsGrid details={indicatorDetails} />
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+interface IndicatorDetailsGridProps {
+  details: IndicatorDetailItem[];
+}
+
+function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
+  const grouped = useMemo(() => {
+    const map = new Map<string, IndicatorDetailItem[]>();
+    details.forEach((item) => {
+      const arr = map.get(item.category) ?? [];
+      arr.push(item);
+      map.set(item.category, arr);
+    });
+    return Array.from(map.entries());
+  }, [details]);
+
+  const formatValue = useCallback((item: IndicatorDetailItem) => {
+    if (item.value === null || item.value === undefined) {
+      return '—';
+    }
+    const config = INDICATOR_CONFIGS.find((cfg) => cfg.key === item.key);
+    if (config?.formatValue) {
+      return config.formatValue(item.value);
+    }
+    return item.value.toFixed(2);
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      {grouped.map(([category, items]) => (
+        <div key={category} className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            {category}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {items.map((item) => (
+              <div
+                key={item.key}
+                className="rounded-lg border border-border bg-card/80 px-4 py-3 shadow-sm hover:border-accent/40 transition"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                    <div className="text-xs text-muted-foreground">{item.name}</div>
+                  </div>
+                  {typeof item.rank === 'number' && (
+                    <Badge variant="outline" className="text-[10px] uppercase">
+                      Rank #{item.rank}
+                    </Badge>
+                  )}
+                </div>
+                <div className="mt-3 flex items-end justify-between">
+                  <div>
+                    <div className="text-2xl font-semibold text-foreground leading-none">
+                      {formatValue(item)}
+                    </div>
+                    {item.extreme && (
+                      <p className="mt-1 text-[11px] font-medium uppercase text-muted-foreground">
+                        {item.extreme.replace(/_/g, ' ')}
+                      </p>
+                    )}
+                  </div>
+                  {item.thresholds && (
+                    <div className="text-right text-[10px] text-muted-foreground space-y-0.5">
+                      {Object.entries(item.thresholds).map(([label, value]) => (
+                        <div key={label}>{label}: {value}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
