@@ -149,6 +149,7 @@ export interface IndicatorDetailItem {
   rank: number | null;
   direction?: IndicatorConfig['direction'];
   thresholds?: IndicatorConfig['thresholds'] | null;
+  format?: (value: number) => string;
 }
 
 export interface IndicatorDetailResponse {

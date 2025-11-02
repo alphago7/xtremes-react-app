@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
 import type { IndicatorDetailResponse, IndicatorDetailItem } from '@/types';
+import { ADDITIONAL_INDICATOR_DEFINITIONS } from '@/lib/indicator-columns';
 
 type ExchangeFilter = 'NSE' | 'US';
 
@@ -87,33 +88,44 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const additionalIndicators: IndicatorDetailItem[] = Object.keys(data)
-      .filter((key) => {
-        if (seenValueColumns.has(key)) return false;
-        if (['symbol', 'company_name', 'exchange', 'updated_at', 'created_at', 'as_of'].includes(key)) return false;
-        if (key.endsWith('_rank') || key.endsWith('_extreme') || key.endsWith('_value')) return false;
-        const value = data[key as keyof typeof data];
-        return typeof value === 'number';
-      })
-      .map((key) => {
-        const value = data[key as keyof typeof data];
-        const extremeValue = data[`${key}_extreme` as keyof typeof data] ?? null;
-        const rankColumn = deriveRankColumn(key);
-        const rankValue = data[rankColumn as keyof typeof data];
-        const title = key
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (char) => char.toUpperCase());
+    const additionalIndicators: IndicatorDetailItem[] = [];
 
-        return {
-          key,
-          title,
-          name: key,
-          category: 'additional',
-          value: typeof value === 'number' ? value : null,
-          extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
-          rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
-        } satisfies IndicatorDetailItem;
+    ADDITIONAL_INDICATOR_DEFINITIONS.forEach((def) => {
+      if (seenValueColumns.has(def.column)) {
+        return;
+      }
+
+      const rawValue = data[def.column as keyof typeof data];
+
+      if (rawValue === undefined) {
+        return;
+      }
+
+      const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? null);
+      const extremeKey = `${def.column}_extreme` as keyof typeof data;
+      const rankColumn = deriveRankColumn(def.column);
+      const extremeValue = data[extremeKey] ?? null;
+      const rankValue = data[rankColumn as keyof typeof data];
+
+      seenValueColumns.add(def.column);
+      if (rankColumn) {
+        seenValueColumns.add(rankColumn);
+      }
+      if (typeof extremeValue !== 'undefined') {
+        seenValueColumns.add(`${def.column}_extreme`);
+      }
+
+      additionalIndicators.push({
+        key: def.column,
+        title: def.title,
+        name: def.name ?? def.title,
+        category: def.category,
+        value: Number.isFinite(value) ? value : null,
+        extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
+        rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
+        format: def.format,
       });
+    });
 
     const combined = [...indicators, ...additionalIndicators].sort((a, b) => {
       const categoryOrder = ['momentum', 'trend', 'volume', 'volatility', 'additional'];

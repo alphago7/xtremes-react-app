@@ -580,6 +580,13 @@ function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
     if (item.value === null || item.value === undefined) {
       return '—';
     }
+    if (item.format) {
+      try {
+        return item.format(item.value);
+      } catch (error) {
+        console.warn('Indicator format error', error);
+      }
+    }
     const config = INDICATOR_CONFIGS.find((cfg) => cfg.key === item.key);
     if (config?.formatValue) {
       return config.formatValue(item.value);
