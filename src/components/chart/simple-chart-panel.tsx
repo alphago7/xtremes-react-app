@@ -577,7 +577,7 @@ function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
         console.warn('Indicator format error', error);
       }
     }
-    const config = INDICATOR_CONFIGS.find((cfg) => cfg.key === item.key);
+    const config = INDICATOR_CONFIGS.find((cfg) => cfg.key === item.key || cfg.valueColumn === item.column);
     if (config?.formatValue) {
       return config.formatValue(item.value);
     }
@@ -593,6 +593,7 @@ function IndicatorDetailsGrid({ details }: IndicatorDetailsGridProps) {
         >
           <div className="min-w-0">
             <div className="text-sm font-semibold text-foreground truncate">{item.title}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{item.column}</div>
             {item.extreme && (
               <div className="text-[11px] uppercase text-muted-foreground">{item.extreme.replace(/_/g, ' ')}</div>
             )}

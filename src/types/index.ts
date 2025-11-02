@@ -141,6 +141,7 @@ export interface ExtremSymbol {
 
 export interface IndicatorDetailItem {
   key: string;
+  column: string;
   title: string;
   name: string;
   category: IndicatorConfig['category'] | 'additional';

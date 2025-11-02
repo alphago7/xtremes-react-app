@@ -56,85 +56,52 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Symbol not found' }, { status: 404 });
     }
 
-    const seenValueColumns = new Set<string>();
+    const configByColumn = new Map(INDICATOR_CONFIGS.map((cfg) => [cfg.valueColumn, cfg]));
 
-    const indicators: IndicatorDetailItem[] = INDICATOR_CONFIGS.map((config) => {
-      const rankColumn = deriveRankColumn(config.valueColumn);
-      seenValueColumns.add(config.valueColumn);
-      if (config.extremeColumn) {
-        seenValueColumns.add(config.extremeColumn);
-      }
-      if (rankColumn) {
-        seenValueColumns.add(rankColumn);
-      }
-
-      const value = data[config.valueColumn as keyof typeof data];
-      const extremeValue = config.extremeColumn
-        ? data[config.extremeColumn as keyof typeof data]
-        : null;
-      const rankValue = data[rankColumn as keyof typeof data];
-
-      return {
-        key: config.key,
-        title: config.title,
-        name: config.name,
-        category: config.category,
-        value: typeof value === 'number' ? value : value === null ? null : Number(value ?? null),
-        extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
-        rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
-        direction: config.direction,
-        thresholds: config.thresholds || null,
-      };
-    });
-
-    const additionalIndicators: IndicatorDetailItem[] = Object.keys(data)
+    const indicators: IndicatorDetailItem[] = Object.keys(data)
       .filter((column) => {
-        if (seenValueColumns.has(column)) return false;
         if (['symbol', 'company_name', 'exchange', 'updated_at', 'created_at', 'as_of'].includes(column)) return false;
-        if (column.endsWith('_rank') || column.endsWith('_extreme') || column.endsWith('_value')) return false;
+        if (column.endsWith('_rank') || column.endsWith('_extreme')) return false;
         const raw = data[column as keyof typeof data];
         return typeof raw === 'number';
       })
       .map((column) => {
+        const config = configByColumn.get(column);
         const rawValue = data[column as keyof typeof data];
         const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? null);
-        const extremeValue = data[`${column}_extreme` as keyof typeof data] ?? null;
         const rankColumn = deriveRankColumn(column);
         const rankValue = data[rankColumn as keyof typeof data];
+        const extremeValue = config?.extremeColumn
+          ? data[config.extremeColumn as keyof typeof data] ?? null
+          : data[`${column}_extreme` as keyof typeof data] ?? null;
 
-        const category = inferCategory(column);
-        const title = getFriendlyTitle(column);
-
-        seenValueColumns.add(column);
-        if (rankColumn) {
-          seenValueColumns.add(rankColumn);
-        }
-        if (typeof extremeValue !== 'undefined') {
-          seenValueColumns.add(`${column}_extreme`);
-        }
+        const title = config?.title ?? column
+          .split('_')
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
 
         return {
-          key: column,
+          key: config?.key ?? column,
+          column,
           title,
-          name: title,
-          category,
+          name: config?.name ?? title,
+          category: config?.category ?? 'additional',
           value: Number.isFinite(value) ? value : null,
           extreme: typeof extremeValue === 'string' ? extremeValue : extremeValue === null ? null : String(extremeValue),
           rank: typeof rankValue === 'number' ? rankValue : rankValue === null ? null : Number(rankValue ?? null),
-          format: getFormatter(column),
+          direction: config?.direction,
+          thresholds: config?.thresholds ?? null,
+          format: config?.formatValue,
         } satisfies IndicatorDetailItem;
-      });
-
-    const combined = [...indicators, ...additionalIndicators].sort((a, b) => {
-      return a.title.localeCompare(b.title);
-    });
+      })
+      .sort((a, b) => a.title.localeCompare(b.title));
 
     const response: IndicatorDetailResponse = {
       symbol: data.symbol,
       exchange,
       companyName: data.company_name,
       updatedAt: data.updated_at || data.as_of || null,
-      indicators: combined,
+      indicators,
     };
 
     return NextResponse.json({ success: true, data: response });
