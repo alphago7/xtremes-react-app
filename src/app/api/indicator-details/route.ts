@@ -126,8 +126,7 @@ export async function GET(request: NextRequest) {
       });
 
     const combined = [...indicators, ...additionalIndicators].sort((a, b) => {
-      const categoryOrder = ['momentum', 'trend', 'volume', 'volatility', 'additional'];
-      return categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+      return a.title.localeCompare(b.title);
     });
 
     const response: IndicatorDetailResponse = {
