@@ -56,30 +56,70 @@ export async function GET(request: NextRequest) {
       indicator.valueColumn,
     ];
 
-    if (indicator.extremeColumn) {
+    // Only select extreme column for NSE table
+    if (indicator.extremeColumn && tableName === 'stock_indicators') {
       selectColumns.push(indicator.extremeColumn);
+    }
+
+    // Include rank column if available
+    if (indicator.rankColumn) {
+      selectColumns.push(indicator.rankColumn);
     }
 
     if (tableName !== 'stock_indicators_us') {
       selectColumns.push('exchange');
     }
 
-    const orderAscending = indicator.direction === 'high' ? view === 'bottom' : view === 'top';
-
     let query = supabase
       .from(tableName)
       .select(selectColumns.join(', '))
-      .not(indicator.valueColumn, 'is', null)
-      .order(indicator.valueColumn, { ascending: orderAscending, nullsFirst: false })
-      .range(offset, offset + limit - 1);
+      .not(indicator.valueColumn, 'is', null);
 
     if (tableName === 'stock_indicators') {
       query = query.eq('exchange', exchange);
     }
 
+    // Use rank-based queries if rank column is available
+    if (indicator.rankColumn) {
+      if (view === 'top') {
+        // Top view: fetch low rank numbers (1, 2, 3...)
+        query = query
+          .gte(indicator.rankColumn, offset + 1)
+          .lte(indicator.rankColumn, offset + limit)
+          .order(indicator.rankColumn, { ascending: true, nullsFirst: false });
+      } else {
+        // Bottom view: fetch high rank numbers (descending from highest)
+        query = query
+          .order(indicator.rankColumn, { ascending: false, nullsFirst: false })
+          .range(offset, offset + limit - 1);
+      }
+    } else {
+      // Fallback to value-based ordering for indicators without rank columns
+      const orderAscending = indicator.direction === 'high' ? view === 'bottom' : view === 'top';
+      query = query
+        .order(indicator.valueColumn, { ascending: orderAscending, nullsFirst: false })
+        .range(offset, offset + limit - 1);
+    }
+
     const { data, error } = await query;
 
     if (error) {
+      // Handle missing columns gracefully (schema differences between NSE and US)
+      if (error.message?.includes('does not exist')) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          meta: {
+            indicatorKey,
+            exchange,
+            view,
+            limit,
+            offset,
+            count: 0,
+            hasMore: false,
+          },
+        });
+      }
       console.error('Indicator explore query error:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
@@ -93,14 +133,21 @@ export async function GET(request: NextRequest) {
           ? 'US'
           : (row.exchange as string | undefined) ?? exchange;
 
+      // Use actual rank from database if available, otherwise calculate from offset
+      const rank = indicator.rankColumn && row[indicator.rankColumn] !== null && row[indicator.rankColumn] !== undefined
+        ? Number(row[indicator.rankColumn])
+        : offset + index + 1;
+
       return {
         ticker: row.symbol,
         company_name: row.company_name,
         value: Number(row[indicator.valueColumn] ?? 0),
-        extreme: indicator.extremeColumn ? (row[indicator.extremeColumn] as string | null) : null,
+        extreme: indicator.extremeColumn && tableName === 'stock_indicators'
+          ? (row[indicator.extremeColumn] as string | null)
+          : null,
         exchange: exchangeValue,
         captured_at: capturedAt,
-        rank: offset + index + 1,
+        rank: rank,
         sparkline: [],
       };
     });
