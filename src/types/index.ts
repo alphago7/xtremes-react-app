@@ -208,6 +208,7 @@ export interface IndicatorConfig {
   name: string;
   category: 'momentum' | 'trend' | 'volume' | 'volatility';
   valueColumn: string;
+  rankColumn?: string;
   extremeColumn?: string;
   direction: 'high' | 'low';
   title: string;

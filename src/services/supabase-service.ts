@@ -113,10 +113,6 @@ export class SupabaseService {
     // Order by value
     query = query.order(valueColumn, { ascending: direction === 'low', nullsFirst: false });
 
-    if (exchange !== 'ALL' && tableName === 'stock_indicators') {
-      query = query.eq('exchange', exchange);
-    }
-
     const { data, error } = await query.limit(limit);
 
     if (error) {
@@ -124,18 +120,15 @@ export class SupabaseService {
       return [];
     }
 
-    const rows = (data ?? []) as StockIndicatorRow[];
+    const rows = (data ?? []) as unknown as StockIndicatorRow[];
 
     return rows.map((item) => {
-      const exchangeValue =
-        tableName === 'stock_indicators_us' ? 'US' : (item.exchange as string | undefined);
-
       return {
         ticker: item.symbol,
         company_name: item.company_name,
         value: Number(item[valueColumn] ?? 0),
         extreme: (item[extremeColumn] as string | null) ?? null,
-        exchange: exchangeValue,
+        exchange: item.exchange as string | undefined,
       };
     });
   }

@@ -48,6 +48,11 @@ export async function GET(request: NextRequest) {
           selectColumns.push(config.extremeColumn);
         }
 
+        // Include rank column if available
+        if (config.rankColumn) {
+          selectColumns.push(config.rankColumn);
+        }
+
         let query = supabase
           .from(tableName)
           .select(selectColumns.join(', '))
@@ -58,11 +63,22 @@ export async function GET(request: NextRequest) {
           query = query.eq('exchange', exchange);
         }
 
-        // Order by value
-        query = query.order(config.valueColumn, {
-          ascending: config.direction === 'low',
-          nullsFirst: false,
-        });
+        // Use rank-based query if rankColumn is available, otherwise fallback to value ordering
+        if (config.rankColumn) {
+          if (config.direction === 'high') {
+            // For high direction: fetch first 10 ranks (1-10 are highest values/overbought)
+            query = query.lte(config.rankColumn, limit).order(config.rankColumn, { ascending: true });
+          } else {
+            // For low direction: fetch last 10 ranks (highest rank numbers are lowest values/oversold)
+            query = query.order(config.rankColumn, { ascending: false, nullsFirst: false });
+          }
+        } else {
+          // Fallback to old logic for indicators without rank columns
+          query = query.order(config.valueColumn, {
+            ascending: config.direction === 'low',
+            nullsFirst: false,
+          });
+        }
 
         const { data, error } = await query.limit(limit);
 
@@ -78,6 +94,11 @@ export async function GET(request: NextRequest) {
               ? 'US'
               : (item.exchange as string | undefined);
 
+          // Use actual rank from database if available, otherwise use index
+          const rank = config.rankColumn && item[config.rankColumn] !== null && item[config.rankColumn] !== undefined
+            ? Number(item[config.rankColumn])
+            : index + 1;
+
           return {
             ticker: item.symbol,
             company_name: item.company_name,
@@ -87,7 +108,7 @@ export async function GET(request: NextRequest) {
               : exchangeValue ?? null,
             exchange: exchangeValue,
             captured_at: new Date().toISOString(),
-            rank: index + 1,
+            rank: rank,
             sparkline: [],
           };
         });
