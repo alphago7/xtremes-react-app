@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    const rows = (data ?? []) as IndicatorRow[];
+    const rows = (data ?? []) as unknown as IndicatorRow[];
     const capturedAt = new Date().toISOString();
 
     const results: ExtremSymbol[] = rows.map((row, index) => {

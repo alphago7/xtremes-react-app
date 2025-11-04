@@ -70,7 +70,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           console.log('[INIT] Loading lightweight-charts...');
 
           const lightweightCharts = await import('lightweight-charts');
-          const createChartFn = lightweightCharts.createChart || lightweightCharts.default?.createChart;
+          const createChartFn = lightweightCharts.createChart || (lightweightCharts as any).default?.createChart;
 
           if (!createChartFn) {
             throw new Error('lightweight-charts createChart function not found');
@@ -100,7 +100,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
 
           console.log('[INIT] Adding candlestick series...');
           const candlestickDefinition =
-            lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
+            lightweightCharts.CandlestickSeries || (lightweightCharts as any).default?.CandlestickSeries;
 
           let candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
 
@@ -112,8 +112,8 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
               wickUpColor: '#10b981',
               wickDownColor: '#ef4444',
             }) as ISeriesApi<'Candlestick'>;
-          } else if (typeof chart.addCandlestickSeries === 'function') {
-            candlestickSeries = chart.addCandlestickSeries({
+          } else if (typeof (chart as any).addCandlestickSeries === 'function') {
+            candlestickSeries = (chart as any).addCandlestickSeries({
               upColor: '#10b981',
               downColor: '#ef4444',
               borderVisible: false,
@@ -125,7 +125,7 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
           }
 
           const histogramDefinition =
-            lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
+            lightweightCharts.HistogramSeries || (lightweightCharts as any).default?.HistogramSeries;
 
           let histogramSeries: ISeriesApi<'Histogram'> | null = null;
 
@@ -135,8 +135,8 @@ export function ChartPanel({ symbol, exchange = 'NSE', isOpen, onClose }: ChartP
               priceScaleId: '',
               color: '#2563eb',
             }) as ISeriesApi<'Histogram'>;
-          } else if (typeof chart.addHistogramSeries === 'function') {
-            histogramSeries = chart.addHistogramSeries({
+          } else if (typeof (chart as any).addHistogramSeries === 'function') {
+            histogramSeries = (chart as any).addHistogramSeries({
               priceFormat: { type: 'volume' },
               priceScaleId: '',
               color: '#2563eb',

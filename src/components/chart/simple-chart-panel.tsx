@@ -214,7 +214,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
           return;
         }
         const createChartFn =
-          lightweightCharts.createChart || lightweightCharts.default?.createChart;
+          lightweightCharts.createChart || (lightweightCharts as any).default?.createChart;
 
         if (!createChartFn) {
           throw new Error('lightweight-charts createChart function not found');
@@ -244,7 +244,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
         });
 
         const candlestickDefinition =
-          lightweightCharts.CandlestickSeries || lightweightCharts.default?.CandlestickSeries;
+          lightweightCharts.CandlestickSeries || (lightweightCharts as any).default?.CandlestickSeries;
 
         let series: ISeriesApi<'Candlestick'> | null = null;
         if (chart.addSeries && candlestickDefinition) {
@@ -255,8 +255,8 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
             wickUpColor: '#10b981',
             wickDownColor: '#ef4444',
           }) as ISeriesApi<'Candlestick'>;
-        } else if (typeof chart.addCandlestickSeries === 'function') {
-          series = chart.addCandlestickSeries({
+        } else if (typeof (chart as any).addCandlestickSeries === 'function') {
+          series = (chart as any).addCandlestickSeries({
             upColor: '#10b981',
             downColor: '#ef4444',
             borderVisible: false,
@@ -269,7 +269,7 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
 
         let volumeSeries: ISeriesApi<'Histogram'> | null = null;
         const histogramDefinition =
-          lightweightCharts.HistogramSeries || lightweightCharts.default?.HistogramSeries;
+          lightweightCharts.HistogramSeries || (lightweightCharts as any).default?.HistogramSeries;
 
         if (chart.addSeries && histogramDefinition) {
           volumeSeries = chart.addSeries(histogramDefinition as never, {
@@ -278,8 +278,8 @@ export function SimpleChartPanel({ symbol, exchange = 'NSE', isOpen, onClose, wa
             color: '#2563eb',
             baseLineColor: '#2563eb',
           }) as ISeriesApi<'Histogram'>;
-        } else if (typeof chart.addHistogramSeries === 'function') {
-          volumeSeries = chart.addHistogramSeries({
+        } else if (typeof (chart as any).addHistogramSeries === 'function') {
+          volumeSeries = (chart as any).addHistogramSeries({
             priceFormat: { type: 'volume' },
             priceScaleId: '',
             color: '#2563eb',

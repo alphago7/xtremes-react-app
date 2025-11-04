@@ -94,11 +94,12 @@ export async function GET(request: NextRequest) {
 
     // Try to fetch from database first
     const { data: dbData, error: dbError } = await supabase
-      .from<OhlcRow>('ohlc_prices')
+      .from('ohlc_prices')
       .select('trading_date, open, high, low, close, volume')
       .eq('symbol', symbol)
       .eq('exchange', exchange)
-      .order('trading_date', { ascending: true });
+      .order('trading_date', { ascending: true })
+      .returns<OhlcRow[]>();
 
     if (dbError) {
       console.error('Supabase OHLC fetch error:', dbError);
@@ -147,7 +148,7 @@ export async function GET(request: NextRequest) {
         symbol,
         exchange,
         count: ohlcData.length,
-        source: ohlcData.length === 0 ? 'none' : dbData?.length > 0 ? 'database' : 'eodhd',
+        source: ohlcData.length === 0 ? 'none' : (dbData && dbData.length > 0) ? 'database' : 'eodhd',
       },
     });
   } catch (error) {

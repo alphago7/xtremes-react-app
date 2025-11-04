@@ -180,7 +180,7 @@ export default function ExploreIndicatorsPage() {
       indicatorTitle: indicator.title,
       indicatorName: indicator.name,
       indicatorValue: item.value,
-      indicatorRank: item.rank,
+      indicatorRank: item.rank ?? undefined,
       capturedAt: item.captured_at ?? new Date().toISOString(),
     });
     setChartOpen(true);

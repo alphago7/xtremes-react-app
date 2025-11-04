@@ -3,6 +3,8 @@
 import { ReactNode } from 'react';
 import { SidebarNav } from './sidebar-nav';
 import { TopBar } from './top-bar';
+import { AnimatedBackground } from '@/components/ui/animated-background';
+import { CommandPalette } from '@/components/ui/command-palette';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -10,7 +12,13 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background relative">
+      {/* Animated Background */}
+      <AnimatedBackground />
+
+      {/* Command Palette */}
+      <CommandPalette />
+
       {/* Sidebar */}
       <SidebarNav />
 
@@ -20,7 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <TopBar />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-background">
+        <main className="flex-1 overflow-auto">
           {children}
         </main>
       </div>

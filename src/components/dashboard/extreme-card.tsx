@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -86,14 +87,27 @@ export function ExtremeCard({
   indicatorKey,
 }: ExtremeCardProps) {
   const getExtremeColor = (extreme: string | null) => {
-    if (!extreme) return 'text-neutral';
+    if (!extreme) return 'text-neutral-flow-start';
     if (extreme.includes('overbought') || extreme.includes('strong_buying')) {
-      return 'text-danger';
+      return 'text-bearish-critical';
     }
     if (extreme.includes('oversold') || extreme.includes('strong_selling')) {
-      return 'text-bullish';
+      return 'text-bullish-active';
     }
-    return 'text-neutral';
+    return 'text-neutral-flow-start';
+  };
+
+  const getSignalIntensity = (value: number, indicator: string) => {
+    // Map indicator value to signal intensity (0-100%)
+    // This determines which color spectrum to use
+    if (indicator === 'rsi') {
+      if (value > 70) return 'explosive'; // Overbought extreme
+      if (value > 60) return 'active';
+      if (value < 30) return 'explosive'; // Oversold extreme
+      if (value < 40) return 'active';
+      return 'calm';
+    }
+    return 'calm';
   };
 
   const defaultFormatValue = (value: number, indicator: string) => {
@@ -122,7 +136,7 @@ export function ExtremeCard({
   };
 
   return (
-    <Card className="bg-card border-border hover:border-accent/50 transition-all duration-200 hover:shadow-md">
+    <Card variant="glass" className="overflow-hidden texture-grain">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -132,18 +146,18 @@ export function ExtremeCard({
                 <TooltipTrigger asChild>
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
+                <TooltipContent className="max-w-xs glass-heavy">
                   <p className="text-xs">{description}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
           <div className="flex flex-col items-end gap-1">
-            <Badge variant="outline" className={cn('text-xs', getCategoryColor(category))}>
+            <Badge variant="outline" className={cn('text-xs backdrop-blur-sm', getCategoryColor(category))}>
               {category?.toUpperCase() || indicator.toUpperCase()}
             </Badge>
             {latestValue !== undefined && (
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-bold text-accent tabular-nums">
                 {formatValue ? formatValue(latestValue) : latestValue.toFixed(2)}
               </span>
             )}
@@ -157,9 +171,13 @@ export function ExtremeCard({
           </div>
         ) : (
           symbols.map((symbol, index) => (
-            <div
+            <motion.div
               key={symbol.ticker}
-              className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-surface/50 cursor-pointer transition-all duration-150 group"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03, type: 'spring', stiffness: 300, damping: 25 }}
+              className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-accent/10 cursor-pointer transition-all duration-150 group hover:scale-[1.01]"
+              whileHover={{ x: 4 }}
               onClick={() =>
                 onSymbolClick(symbol.ticker, {
                   exchange: symbol.exchange,
@@ -170,7 +188,7 @@ export function ExtremeCard({
                     indicatorValue: symbol.value,
                     indicatorRank: index + 1,
                     companyName: symbol.company_name,
-                    capturedAt: symbol.captured_at,
+                    capturedAt: symbol.captured_at ?? undefined,
                   },
                 })
               }
@@ -222,7 +240,7 @@ export function ExtremeCard({
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))
         )}
       </CardContent>

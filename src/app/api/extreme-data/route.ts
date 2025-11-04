@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         }
 
         let query = supabase
-          .from<StockIndicatorRow>(tableName)
+          .from(tableName)
           .select(selectColumns.join(', '))
           .not(config.valueColumn, 'is', null);
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Transform data to match ExtremSymbol interface
-        const transformedData: ExtremSymbol[] = (data || []).map((item, index) => {
+        const transformedData: ExtremSymbol[] = ((data || []) as unknown as StockIndicatorRow[]).map((item, index) => {
           const exchangeValue =
             tableName === 'stock_indicators_us'
               ? 'US'

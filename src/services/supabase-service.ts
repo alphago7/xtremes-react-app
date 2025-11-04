@@ -100,16 +100,13 @@ export class SupabaseService {
     const valueColumn = columnMap[indicator];
     const extremeColumn = extremeColumnMap[indicator];
 
-    const tableName = getStockIndicatorTable(exchange);
+    const tableName = 'stock_indicators'; // Use default table
 
     // Build query and filter out null values
-    const selectColumns = [`symbol`, `company_name`, valueColumn, extremeColumn];
-    if (tableName !== 'stock_indicators_us') {
-      selectColumns.push('exchange');
-    }
+    const selectColumns = [`symbol`, `company_name`, valueColumn, extremeColumn, 'exchange'];
 
     let query = supabase
-      .from<StockIndicatorRow>(tableName)
+      .from(tableName)
       .select(selectColumns.join(', '))
       .not(valueColumn, 'is', null);
 
