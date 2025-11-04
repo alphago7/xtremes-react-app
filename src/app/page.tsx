@@ -9,7 +9,6 @@ import { ExtremSymbol } from '@/types';
 import type { WatchlistItemInput } from '@/store/watchlist-store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INDICATOR_CONFIGS } from '@/config/indicators';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ExtremeDataMeta {
   indicatorCount: number;
@@ -122,19 +121,6 @@ export default function DashboardPage() {
       : INDICATOR_CONFIGS.filter((config) => config.category === selectedCategory);
   }, [selectedCategory]);
 
-  // Calculate summary stats
-  const summaryStats = useMemo(() => {
-    const totalStocks = Object.values(extremeData).reduce((acc, symbols) => {
-      return Math.max(acc, symbols.length);
-    }, 0);
-
-    const overbought = extremeData.rsi_high?.filter((s) => s.value > 70).length || 0;
-    const oversold = extremeData.rsi_low?.filter((s) => s.value < 30).length || 0;
-    const strongTrends = extremeData.adx_high?.filter((s) => s.value > 25).length || 0;
-
-    return { totalStocks, overbought, oversold, strongTrends };
-  }, [extremeData]);
-
   return (
     <div className="p-6 max-w-[1800px] mx-auto">
       {/* Header */}
@@ -148,92 +134,27 @@ export default function DashboardPage() {
       {/* Filters */}
       <DashboardFilters onFilterChange={loadExtremeData} />
 
-      {/* Tabs for different views */}
-      <Tabs defaultValue="extremes" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="extremes">Extremes</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
-        </TabsList>
-
-        {/* Extremes Tab */}
-        <TabsContent value="extremes" className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-card p-4 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Indicators Shown</p>
-              <p className="text-2xl font-bold text-foreground">
-                {meta?.indicatorCount || displayConfigs.length}
-              </p>
-            </div>
-            <div className="bg-card p-4 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Overbought (RSI {`>`} 70)</p>
-              <p className="text-2xl font-bold text-danger">{summaryStats.overbought}</p>
-            </div>
-            <div className="bg-card p-4 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Oversold (RSI {`<`} 30)</p>
-              <p className="text-2xl font-bold text-bullish">{summaryStats.oversold}</p>
-            </div>
-            <div className="bg-card p-4 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Strong Trends (ADX {`>`} 25)</p>
-              <p className="text-2xl font-bold text-warning">{summaryStats.strongTrends}</p>
-            </div>
-          </div>
-
-          {/* Indicator Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {loading
-              ? // Loading skeletons
-                displayConfigs.map((config) => (
-                  <Skeleton key={config.key} className="h-80 bg-surface" />
-                ))
-              : // Actual cards
-                displayConfigs.map((config) => (
-                  <ExtremeCard
-                    key={config.key}
-                    title={config.title}
-                    indicator={config.name}
-                    description={config.description}
-                    category={config.category}
-                    symbols={extremeData[config.key] || []}
-                    onSymbolClick={handleSymbolClick}
-                    formatValue={config.formatValue}
-                  />
-                ))}
-          </div>
-        </TabsContent>
-
-        {/* Performance Tab */}
-        <TabsContent value="performance">
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">Performance Analysis</h3>
-            <p className="text-sm text-muted-foreground">
-              Comparative performance metrics and charts will be displayed here
-            </p>
-          </div>
-        </TabsContent>
-
-        {/* Trends Tab */}
-        <TabsContent value="trends">
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">Trend Analysis</h3>
-            <p className="text-sm text-muted-foreground">
-              Indicator correlations and crossover signals will be shown here
-            </p>
-          </div>
-        </TabsContent>
-
-        {/* Insights Tab */}
-        <TabsContent value="insights">
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">Market Insights</h3>
-            <p className="text-sm text-muted-foreground">
-              AI-generated insights based on indicator movements will appear here
-            </p>
-          </div>
-        </TabsContent>
-      </Tabs>
+      {/* Indicator Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {loading
+          ? // Loading skeletons
+            displayConfigs.map((config) => (
+              <Skeleton key={config.key} className="h-80 bg-surface" />
+            ))
+          : // Actual cards
+            displayConfigs.map((config) => (
+              <ExtremeCard
+                key={config.key}
+                title={config.title}
+                indicator={config.name}
+                description={config.description}
+                category={config.category}
+                symbols={extremeData[config.key] || []}
+                onSymbolClick={handleSymbolClick}
+                formatValue={config.formatValue}
+              />
+            ))}
+      </div>
 
       {/* Chart Panel */}
       <SimpleChartPanel
