@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
           selectColumns.push('exchange');
         }
 
-        if (config.extremeColumn) {
+        // Only select extreme column for NSE table (stock_indicators_us doesn't have _extreme columns)
+        if (config.extremeColumn && tableName === 'stock_indicators') {
           selectColumns.push(config.extremeColumn);
         }
 
@@ -83,6 +84,10 @@ export async function GET(request: NextRequest) {
         const { data, error } = await query.limit(limit);
 
         if (error) {
+          // Silently return empty data for missing columns (schema differences between NSE and US)
+          if (error.message?.includes('does not exist')) {
+            return { key: config.key, data: [] };
+          }
           console.error(`Error fetching ${config.key}:`, error);
           return { key: config.key, data: [] };
         }
@@ -103,9 +108,9 @@ export async function GET(request: NextRequest) {
             ticker: item.symbol,
             company_name: item.company_name,
             value: Number(item[config.valueColumn] ?? 0),
-            extreme: config.extremeColumn
+            extreme: config.extremeColumn && tableName === 'stock_indicators'
               ? (item[config.extremeColumn] as string | null)
-              : exchangeValue ?? null,
+              : null,
             exchange: exchangeValue,
             captured_at: new Date().toISOString(),
             rank: rank,
