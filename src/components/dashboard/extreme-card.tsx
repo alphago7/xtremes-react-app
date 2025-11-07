@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { ExtremSymbol } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -30,12 +31,16 @@ interface ExtremeCardProps {
   title: string;
   indicator: string;
   description: string;
-  symbols: ExtremSymbol[];
+  highSymbols: ExtremSymbol[];
+  lowSymbols: ExtremSymbol[];
   onSymbolClick: (symbol: string, options?: string | SymbolClickMeta) => void;
   category?: string;
   latestValue?: number;
   formatValue?: (value: number) => string;
-  indicatorKey?: string;
+  highIndicatorKey?: string;
+  lowIndicatorKey?: string;
+  highLabel?: string;
+  lowLabel?: string;
 }
 
 // Simple sparkline component
@@ -79,13 +84,21 @@ export function ExtremeCard({
   title,
   indicator,
   description,
-  symbols,
+  highSymbols,
+  lowSymbols,
   onSymbolClick,
   category,
   latestValue,
   formatValue,
-  indicatorKey,
+  highIndicatorKey,
+  lowIndicatorKey,
+  highLabel = 'Highest',
+  lowLabel = 'Lowest',
 }: ExtremeCardProps) {
+  const [view, setView] = useState<'high' | 'low'>('high');
+
+  const symbols = view === 'high' ? highSymbols : lowSymbols;
+  const indicatorKey = view === 'high' ? highIndicatorKey : lowIndicatorKey;
   const getExtremeColor = (extreme: string | null) => {
     if (!extreme) return 'text-neutral-flow-start';
     if (extreme.includes('overbought') || extreme.includes('strong_buying')) {
@@ -138,7 +151,7 @@ export function ExtremeCard({
   return (
     <Card variant="glass" className="overflow-hidden texture-grain">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <span>{title}</span>
             <TooltipProvider>
@@ -152,16 +165,37 @@ export function ExtremeCard({
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
-          <div className="flex flex-col items-end gap-1">
-            <Badge variant="outline" className={cn('text-xs backdrop-blur-sm', getCategoryColor(category))}>
-              {category?.toUpperCase() || indicator.toUpperCase()}
-            </Badge>
-            {latestValue !== undefined && (
-              <span className="text-xs font-bold text-accent tabular-nums">
-                {formatValue ? formatValue(latestValue) : latestValue.toFixed(2)}
-              </span>
+          <Badge variant="outline" className={cn('text-xs backdrop-blur-sm shrink-0', getCategoryColor(category))}>
+            {category?.toUpperCase() || indicator.toUpperCase()}
+          </Badge>
+        </div>
+
+        {/* Toggle Control */}
+        <div className="inline-flex items-center rounded-lg bg-muted/50 p-1 gap-1">
+          <button
+            onClick={() => setView('high')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200',
+              view === 'high'
+                ? 'bg-accent text-accent-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             )}
-          </div>
+          >
+            <ArrowUp className="h-3 w-3" />
+            {highLabel}
+          </button>
+          <button
+            onClick={() => setView('low')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200',
+              view === 'low'
+                ? 'bg-accent text-accent-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ArrowDown className="h-3 w-3" />
+            {lowLabel}
+          </button>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">

@@ -114,11 +114,35 @@ export default function DashboardPage() {
     }, 300);
   };
 
-  // Filter configs based on selected category
-  const displayConfigs = useMemo(() => {
-    return selectedCategory === 'all'
+  // Group indicator configs by base indicator name (merge high/low pairs)
+  const groupedConfigs = useMemo(() => {
+    const filtered = selectedCategory === 'all'
       ? INDICATOR_CONFIGS
       : INDICATOR_CONFIGS.filter((config) => config.category === selectedCategory);
+
+    // Group by removing _high and _low suffixes
+    const groups = new Map<string, { high?: typeof INDICATOR_CONFIGS[0], low?: typeof INDICATOR_CONFIGS[0] }>();
+
+    filtered.forEach((config) => {
+      const baseKey = config.key.replace(/_high$|_low$/, '');
+      const existing = groups.get(baseKey) || {};
+
+      if (config.direction === 'high') {
+        existing.high = config;
+      } else {
+        existing.low = config;
+      }
+
+      groups.set(baseKey, existing);
+    });
+
+    return Array.from(groups.entries()).map(([baseKey, pair]) => ({
+      baseKey,
+      high: pair.high,
+      low: pair.low,
+      // Use high config as the primary config, fall back to low
+      primary: pair.high || pair.low!,
+    }));
   }, [selectedCategory]);
 
   return (
@@ -138,20 +162,25 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading
           ? // Loading skeletons
-            displayConfigs.map((config) => (
-              <Skeleton key={config.key} className="h-80 bg-surface" />
+            groupedConfigs.map((group) => (
+              <Skeleton key={group.baseKey} className="h-80 bg-surface" />
             ))
           : // Actual cards
-            displayConfigs.map((config) => (
+            groupedConfigs.map((group) => (
               <ExtremeCard
-                key={config.key}
-                title={config.title}
-                indicator={config.name}
-                description={config.description}
-                category={config.category}
-                symbols={extremeData[config.key] || []}
+                key={group.baseKey}
+                title={group.primary.name}
+                indicator={group.primary.name}
+                description={group.high?.description || group.low?.description || ''}
+                category={group.primary.category}
+                highSymbols={group.high ? extremeData[group.high.key] || [] : []}
+                lowSymbols={group.low ? extremeData[group.low.key] || [] : []}
                 onSymbolClick={handleSymbolClick}
-                formatValue={config.formatValue}
+                formatValue={group.primary.formatValue}
+                highIndicatorKey={group.high?.key}
+                lowIndicatorKey={group.low?.key}
+                highLabel={group.high?.direction === 'high' ? 'Highest' : 'Overbought'}
+                lowLabel={group.low?.direction === 'low' ? 'Lowest' : 'Oversold'}
               />
             ))}
       </div>
